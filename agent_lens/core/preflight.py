@@ -26,6 +26,8 @@ class PreflightChecker:
                     "errors": [f"File does not exist: {file_path}"],
                     "warnings": [],
                 }
+            if os.path.isdir(file_path):
+                return cls.check_directory(file_path)
             try:
                 with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
@@ -97,13 +99,30 @@ class PreflightChecker:
 
     @classmethod
     def _check_js_ts_syntax(cls, file_path: str, content: str, errors: List[str], warnings: List[str]):
+        # 1. Use real Tree-Sitter AST parser if available
+        lang = CodeParser.detect_language(file_path)
+        if lang in ["javascript", "typescript", "tsx"]:
+            res = CodeParser.parse_file(file_path, content=content)
+            if res.parse_error:
+                errors.append(f"{lang.capitalize()} syntax error: {res.parse_error}")
+                return
+            # If Tree-sitter parsed it successfully with symbols or no error, accept it
+            if not res.parse_error and len(res.symbols) > 0:
+                return
+
+        # 2. Heuristic fallback when Tree-Sitter is unavailable
+        cleaned = re.sub(r"/\*[\s\S]*?\*/", "", content)
+        cleaned = re.sub(r"//.*", "", cleaned)
+        # Strip regex literals e.g. /"/[gimsuy]* so quotes inside regex don't trigger string state
+        cleaned = re.sub(r"/(?:\\/|[^/\n])+/[a-z]*", "''", cleaned)
+
         # Balanced brackets check as a robust baseline
         brackets = {"(": ")", "{": "}", "[": "]"}
         stack = []
         in_string = None
         escaped = False
 
-        for idx, char in enumerate(content):
+        for idx, char in enumerate(cleaned):
             if escaped:
                 escaped = False
                 continue
@@ -122,18 +141,18 @@ class PreflightChecker:
                 stack.append((char, idx))
             elif char in brackets.values():
                 if not stack:
-                    line_no = content[:idx].count("\n") + 1
+                    line_no = cleaned[:idx].count("\n") + 1
                     errors.append(f"Unmatched closing bracket `{char}` at line {line_no}")
                     return
                 top, _ = stack.pop()
                 if brackets[top] != char:
-                    line_no = content[:idx].count("\n") + 1
+                    line_no = cleaned[:idx].count("\n") + 1
                     errors.append(f"Mismatched bracket: expected `{brackets[top]}`, got `{char}` at line {line_no}")
                     return
 
         if stack:
             top, pos = stack[-1]
-            line_no = content[:pos].count("\n") + 1
+            line_no = cleaned[:pos].count("\n") + 1
             errors.append(f"Unclosed bracket `{top}` opened at line {line_no}")
 
     @classmethod
@@ -187,3 +206,46 @@ class PreflightChecker:
             }
         except Exception as e:
             return {"status": "error", "reason": str(e)}
+
+    @classmethod
+    def check_directory(cls, dir_path: str) -> Dict[str, Any]:
+        """Recursively inspects code and configuration files within a directory."""
+        all_errors = []
+        all_warnings = []
+        checked_count = 0
+        failed_count = 0
+        details = []
+
+        ignore_dirs = {
+            ".git", ".venv", "venv", "__pycache__", "node_modules", "dist", "build",
+            ".pytest_cache", ".mypy_cache", ".agentlens"
+        }
+        valid_exts = {".py", ".json", ".js", ".ts", ".tsx", ".jsx", ".toml", ".yaml", ".yml"}
+
+        for root, dirs, files in os.walk(dir_path):
+            dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
+            for file in files:
+                ext = os.path.splitext(file)[1].lower()
+                if ext in valid_exts:
+                    full_p = os.path.join(root, file)
+                    rel_p = os.path.relpath(full_p, dir_path).replace("\\", "/")
+                    res = cls.check_file(full_p)
+                    checked_count += 1
+                    if not res["valid"]:
+                        failed_count += 1
+                        for err in res["errors"]:
+                            all_errors.append(f"{rel_p}: {err}")
+                    for warn in res["warnings"]:
+                        all_warnings.append(f"{rel_p}: {warn}")
+                    details.append(res)
+
+        return {
+            "file_path": dir_path,
+            "is_directory": True,
+            "checked_files": checked_count,
+            "failed_files": failed_count,
+            "valid": failed_count == 0,
+            "errors": all_errors,
+            "warnings": all_warnings,
+            "details": details,
+        }
