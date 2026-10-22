@@ -1,6 +1,7 @@
-# AgentLens Protocol Rules for AI Coding Agents
+# Google Antigravity Agent Rules
+# This configuration file informs Google Antigravity and other compatible agentic IDEs
+# of recommended tool protocols when operating inside this codebase.
 
-When working in this repository with AgentLens MCP tools:
 1. Use `lens_get_repo_map` instead of recursively reading directories.
 2. Use `lens_get_symbol_card` instead of reading 1,000+ line files for simple signature lookups.
 3. Check `lens_blast_radius` and `lens_audit_dynamic_risk` before refactoring any symbol.
