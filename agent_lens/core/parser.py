@@ -100,6 +100,37 @@ class PythonASTVisitor(ast.NodeVisitor):
         )
         self.generic_visit(node)
 
+    def visit_Assign(self, node: ast.Assign):
+        if self.current_class is None:
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    is_const = target.id.isupper()
+                    self.symbols.append(
+                        Symbol(
+                            name=target.id,
+                            kind="constant" if is_const else "variable",
+                            line_start=node.lineno,
+                            line_end=node.end_lineno or node.lineno,
+                            signature=f"{target.id} = ...",
+                        )
+                    )
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign):
+        if self.current_class is None and isinstance(node.target, ast.Name):
+            is_const = node.target.id.isupper()
+            ann_str = ast.unparse(node.annotation) if node.annotation else ""
+            self.symbols.append(
+                Symbol(
+                    name=node.target.id,
+                    kind="constant" if is_const else "variable",
+                    line_start=node.lineno,
+                    line_end=node.end_lineno or node.lineno,
+                    signature=f"{node.target.id}: {ann_str}",
+                )
+            )
+        self.generic_visit(node)
+
     def visit_ClassDef(self, node: ast.ClassDef):
         decorators = [ast.unparse(d) for d in node.decorator_list]
         bases = [ast.unparse(b) for b in node.bases]

@@ -26,6 +26,18 @@ class HallucinationGuard:
         "asyncio", "socket", "http", "urllib", "sqlite3", "hashlib", "io"
     }
 
+    BUILTIN_METHODS = {
+        "keys", "values", "items", "get", "append", "extend", "pop", "insert",
+        "remove", "clear", "add", "update", "discard", "copy", "count", "index",
+        "strip", "lstrip", "rstrip", "split", "splitlines", "replace", "startswith",
+        "endswith", "join", "lower", "upper", "capitalize", "title", "format",
+        "find", "rfind", "encode", "decode", "close", "read", "write", "flush",
+        "seek", "connect", "cursor", "execute", "fetchall", "fetchone", "commit",
+        "rollback", "start", "stop", "join", "is_alive", "acquire", "release",
+        "add_argument", "add_parser", "add_subparsers", "parse_args", "print_help",
+        "to_dict", "asdict", "parse", "visit", "generic_visit"
+    }
+
     def __init__(self, cartographer: CodebaseCartographer):
         self.cart = cartographer
 
@@ -102,16 +114,21 @@ class HallucinationGuard:
                     continue
 
                 fn_name, receiver = call_info
-                # Ignore builtins
-                if fn_name in self.BUILTIN_NAMES:
+                # Ignore builtins and common standard library methods
+                if fn_name in self.BUILTIN_NAMES or fn_name in self.BUILTIN_METHODS:
                     continue
 
                 # If receiver is specified e.g. cart.get_outline
                 if receiver:
-                    # Check if symbol exists anywhere in indexed symbols
-                    if fn_name not in self.cart.symbol_index and fn_name not in self.BUILTIN_NAMES:
-                        # Only flag if receiver looks like an internal project class or instance
-                        if any(k.lower() in receiver.lower() for k in ["cart", "parser", "memory", "radar", "packer", "guard"]):
+                    if fn_name in self.BUILTIN_METHODS:
+                        continue
+                    if any(receiver.startswith(p) for p in ["os.", "sys.", "json.", "re.", "subparsers.", "parser."]):
+                        continue
+
+                    # Only flag if receiver looks like an internal project class or instance
+                    target_receivers = ["self.cart", "cart", "cartographer", "self.memory", "memory", "radar", "packer", "guard", "sandbox", "sentinel", "planner"]
+                    if any(r in receiver for r in target_receivers):
+                        if fn_name not in self.cart.symbol_index:
                             best = self._find_best_match(fn_name, all_indexed_symbols)
                             suggestion = f" Did you mean `{best}`?" if best else ""
                             hallucinations.append({

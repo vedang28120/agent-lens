@@ -17,6 +17,7 @@ from ..core.sentinel import PortSentinel
 from ..core.guard import HallucinationGuard
 from ..core.planner import RefactorPlanner
 from ..core.watcher import CodebaseWatcher
+from ..core.report import ArchitectureReporter
 
 
 class SSEBroadcaster:
@@ -171,7 +172,13 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(blast)
             return
 
-        # 10. Static Web Assets
+        # 10. API: Full Architecture Report
+        if path == "/api/report":
+            reporter = ArchitectureReporter(self.cartographer, memory=self.memory)
+            self._send_json({"report": reporter.generate_report()})
+            return
+
+        # 11. Static Web Assets
         rel_req = path.lstrip("/")
         if not rel_req:
             rel_req = "index.html"

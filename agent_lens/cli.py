@@ -11,6 +11,7 @@ from .core.sandbox import GhostPatchSandbox
 from .core.sentinel import PortSentinel
 from .core.guard import HallucinationGuard
 from .core.planner import RefactorPlanner
+from .core.report import ArchitectureReporter
 
 
 def main():
@@ -153,6 +154,11 @@ def main():
     scratch_parser = mem_subs.add_parser("scratchpad", help="Shared human-agent scratchpad")
     scratch_parser.add_argument("action", choices=["get", "set"])
     scratch_parser.add_argument("--content", help="New scratchpad text content")
+
+    # report
+    report_parser = subparsers.add_parser("report", help="Generate comprehensive architectural audit report")
+    report_parser.add_argument("--output", "-o", help="Save markdown report to file (e.g. ARCHITECTURE_REPORT.md)")
+    report_parser.add_argument("--root", default=".", help="Root directory (default: .)")
 
     # mcp
     mcp_parser = subparsers.add_parser("mcp", help="Run AgentLens Model Context Protocol (MCP) server")
@@ -438,6 +444,16 @@ def main():
                     sys.exit(1)
                 mem.update_scratchpad(args.content, updated_by="agent")
                 print("Scratchpad updated.")
+
+    elif args.command == "report":
+        cart = CodebaseCartographer(args.root)
+        cart.scan()
+        reporter = ArchitectureReporter(cart)
+        if args.output:
+            out_file = reporter.write_report_to_file(args.output)
+            print(f"Architecture report generated: {out_file}")
+        else:
+            print(reporter.generate_report())
 
     elif args.command == "mcp":
         from .mcp.server import AgentLensMCPServer
