@@ -72,7 +72,8 @@ class GitShadowSandbox:
 
             # 3. Security check: validate test command does not attempt raw shell invocation
             if isinstance(test_command, str):
-                cmd_args = shlex.split(test_command, posix=True)
+                normalized_cmd = test_command.replace("\\", "/") if sys.platform == "win32" else test_command
+                cmd_args = shlex.split(normalized_cmd, posix=True)
             else:
                 cmd_args = list(test_command)
 
