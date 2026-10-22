@@ -49,6 +49,8 @@ class GitShadowSandbox:
                 cwd=self.cart.root_path,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=10,
             )
             if git_res.returncode == 0:
@@ -61,6 +63,8 @@ class GitShadowSandbox:
                         cwd=self.cart.root_path,
                         capture_output=True,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         timeout=5,
                     )
                     if diff_proc.returncode == 0 and diff_proc.stdout.strip():
@@ -70,6 +74,8 @@ class GitShadowSandbox:
                             cwd=sandbox_path,
                             capture_output=True,
                             text=True,
+                            encoding="utf-8",
+                            errors="replace",
                             timeout=5,
                         )
                     # Also sync untracked non-ignored files
@@ -78,6 +84,8 @@ class GitShadowSandbox:
                         cwd=self.cart.root_path,
                         capture_output=True,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         timeout=5,
                     )
                     if status_proc.returncode == 0:
@@ -147,6 +155,8 @@ class GitShadowSandbox:
                 cwd=sandbox_path,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
                 shell=False,
             )

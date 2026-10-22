@@ -1,12 +1,76 @@
+# Byte-compiled / optimized files
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+*.so
 *.pyd
-.pytest_cache/
-.mypy_cache/
-.agentlens/
+
+# Distribution / packaging
 dist/
 build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
-.venv/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
 venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Unit test & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+htmlcov/
+.tox/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# AgentLens runtime data & local databases
+.agentlens/
+*.db
+*.sqlite
+*.sqlite3
+shadow_worktrees/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Operating System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Logs & temp files
+*.log
+*.tmp
+*.bak

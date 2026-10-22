@@ -29,6 +29,8 @@ class PortSentinel:
                     ["netstat", "-ano", "-p", "tcp"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=5,
                 )
                 output = res.stdout
@@ -103,6 +105,8 @@ class PortSentinel:
                 ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=2,
             )
             line = res.stdout.strip()

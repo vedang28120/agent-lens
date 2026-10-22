@@ -1,13 +1,39 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-lens"
 version = "1.0.0"
-description = "Autonomous AI Coding Assistant Exoskeleton & Mission Control"
-authors = [{ name = "Antigravity Pair Programmer" }]
+description = "Context engine, AST cartography, and safe sandboxing exoskeleton for AI coding agents."
 readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "AgentLens Contributors" }
+]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "ast",
+    "code-analysis",
+    "static-analysis",
+    "developer-tools",
+    "llm",
+    "code-intelligence"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
 requires-python = ">=3.9"
 dependencies = [
     "tree-sitter>=0.21.0",
@@ -16,5 +42,32 @@ dependencies = [
     "tree-sitter-typescript"
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "tree-sitter-go",
+    "tree-sitter-rust",
+    "tree-sitter-java"
+]
+
+[project.urls]
+Homepage = "https://github.com/agent-lens/agent-lens"
+Documentation = "https://github.com/agent-lens/agent-lens/blob/main/AGENT_GUIDE.md"
+Repository = "https://github.com/agent-lens/agent-lens"
+Issues = "https://github.com/agent-lens/agent-lens/issues"
+
 [project.scripts]
 agent-lens = "agent_lens.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agent_lens*"]
+
+[tool.setuptools.package-data]
+agent_lens = ["web/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
