@@ -21,6 +21,8 @@ from ..core.planner import RefactorPlanner
 from ..core.watcher import CodebaseWatcher
 from ..core.report import ArchitectureReporter
 from ..core.security import resolve_safe_path
+from ..core.repomap import RepoMapGenerator
+from ..core.dynamic_risk import DynamicRiskDetector
 
 
 class SSEBroadcaster:
@@ -201,7 +203,27 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"report": reporter.generate_report()})
             return
 
-        # 11. Static Web Assets (Strictly hardened against path traversal)
+        # 11. API: PageRank RepoMap
+        if path == "/api/repomap":
+            budget = int(query.get("budget", [1024])[0])
+            generator = RepoMapGenerator(self.cartographer)
+            res = generator.generate_repo_map(token_budget=budget)
+            self._send_json(res)
+            return
+
+        # 12. API: Dynamic Risk Audit
+        if path == "/api/dynamic-risk":
+            sym = query.get("symbol", [""])[0]
+            f_hint = query.get("file", [None])[0]
+            if not sym:
+                self._send_error(400, "Missing symbol parameter")
+                return
+            detector = DynamicRiskDetector(self.cartographer)
+            res = detector.audit_symbol_dynamic_risk(sym, target_file=f_hint)
+            self._send_json(res)
+            return
+
+        # 13. Static Web Assets (Strictly hardened against path traversal)
         rel_req = path.lstrip("/")
         if not rel_req:
             rel_req = "index.html"
@@ -350,7 +372,9 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/ports/kill":
             port = int(payload.get("port", 0))
-            res = PortSentinel.kill_port(port)
+            confirm = bool(payload.get("confirm", False))
+            force = bool(payload.get("force_non_dev", False))
+            res = PortSentinel.kill_port(port, force_non_dev=force, confirm=confirm)
             broadcaster.broadcast("ports_update", res)
             self._send_json(res)
             return

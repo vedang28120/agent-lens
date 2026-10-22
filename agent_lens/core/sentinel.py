@@ -114,7 +114,7 @@ class PortSentinel:
             return f"PID {pid}"
 
     @classmethod
-    def kill_port(cls, port: int, force_non_dev: bool = False) -> Dict[str, Any]:
+    def kill_port(cls, port: int, force_non_dev: bool = False, confirm: bool = False) -> Dict[str, Any]:
         """Safely finds process on given port and terminates it with comprehensive security validations."""
         # 1. Port boundary check
         if not (1 <= port <= 65535):
@@ -155,6 +155,20 @@ class PortSentinel:
         # 7. Dev port policy enforcement
         if port not in cls.COMMON_DEV_PORTS and not force_non_dev:
             return {"success": False, "message": f"Port {port} is not in COMMON_DEV_PORTS. Pass force_non_dev=True to override."}
+
+        # 8. Explicit Confirmation Guard (Opt-in Safety)
+        if not confirm:
+            return {
+                "success": False,
+                "requires_confirmation": True,
+                "message": (
+                    f"Action requires explicit confirmation. Process '{proc_name}' (PID {pid}) "
+                    f"is listening on port {port}. Pass confirm=True (or --confirm in CLI) to terminate."
+                ),
+                "port": port,
+                "pid": pid,
+                "process": proc_name,
+            }
 
         try:
             if sys.platform == "win32":

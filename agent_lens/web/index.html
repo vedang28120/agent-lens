@@ -132,6 +132,8 @@
         <div class="tab-bar">
           <button class="tab-btn active" data-tab="tab-hypo">Hypotheses (<span id="countHypo">0</span>)</button>
           <button class="tab-btn" data-tab="tab-tasks">Tasks (<span id="countTasks">0</span>)</button>
+          <button class="tab-btn" data-tab="tab-repomap">RepoMap</button>
+          <button class="tab-btn" data-tab="tab-dynamic-risk">Dynamic Risk</button>
           <button class="tab-btn" data-tab="tab-guard">Hallucination Guard</button>
           <button class="tab-btn" data-tab="tab-planner">Refactor Planner</button>
           <button class="tab-btn" data-tab="tab-radar">Arch Radar</button>
@@ -163,6 +165,33 @@
             </div>
             <div class="card-list" id="taskList">
               <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- 3. RepoMap Tab -->
+          <div class="tab-pane" id="tab-repomap">
+            <div class="pane-action-bar">
+              <span style="font-size:0.75rem;color:var(--text-dim);display:flex;align-items:center;">PageRank-weighted, token-budgeted structural map of entire codebase</span>
+              <input type="number" id="repoMapBudgetInput" value="1024" min="200" max="5000" step="128" style="width:90px;" title="Token Budget">
+              <button class="btn btn-primary btn-sm" id="genRepoMapBtn">Generate RepoMap</button>
+              <button class="btn-xs" id="copyRepoMapBtn" style="margin-left:8px;">Copy</button>
+            </div>
+            <div class="packer-output-wrapper">
+              <div class="output-stats">
+                <span id="repoMapStats">Click Generate to compute PageRank-weighted symbol tree</span>
+              </div>
+              <textarea id="repoMapResult" readonly placeholder="# Repository map will appear here..." style="font-family:'Fira Code',monospace;min-height:280px;"></textarea>
+            </div>
+          </div>
+
+          <!-- 4. Dynamic Risk Tab -->
+          <div class="tab-pane" id="tab-dynamic-risk">
+            <div class="pane-action-bar">
+              <input type="text" id="dynamicRiskSymbolInput" placeholder="Symbol name to audit (e.g. 'calculate_blast_radius')...">
+              <button class="btn btn-primary btn-sm" id="runDynamicRiskBtn">Audit Dynamic Risk</button>
+            </div>
+            <div class="card-list" id="dynamicRiskResultsList">
+              <div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">Audits target symbol for getattr/hasattr reflection, string-based lookups, and unimported attribute access.</div>
             </div>
           </div>
 

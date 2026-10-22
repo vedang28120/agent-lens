@@ -6,12 +6,38 @@ from typing import List, Dict, Optional, Any, Set
 
 try:
     from tree_sitter import Language, Parser
-    import tree_sitter_python
+    TREE_SITTER_CORE_AVAILABLE = True
+except Exception:
+    TREE_SITTER_CORE_AVAILABLE = False
+
+try:
     import tree_sitter_javascript
     import tree_sitter_typescript
-    TREE_SITTER_AVAILABLE = True
+    TREE_SITTER_JS_AVAILABLE = True
 except Exception:
-    TREE_SITTER_AVAILABLE = False
+    TREE_SITTER_JS_AVAILABLE = False
+
+try:
+    import tree_sitter_go
+    TREE_SITTER_GO_AVAILABLE = True
+except Exception:
+    TREE_SITTER_GO_AVAILABLE = False
+
+try:
+    import tree_sitter_rust
+    TREE_SITTER_RUST_AVAILABLE = True
+except Exception:
+    TREE_SITTER_RUST_AVAILABLE = False
+
+try:
+    import tree_sitter_java
+    TREE_SITTER_JAVA_AVAILABLE = True
+except Exception:
+    TREE_SITTER_JAVA_AVAILABLE = False
+
+TREE_SITTER_AVAILABLE = TREE_SITTER_CORE_AVAILABLE and (
+    TREE_SITTER_JS_AVAILABLE or TREE_SITTER_GO_AVAILABLE or TREE_SITTER_RUST_AVAILABLE or TREE_SITTER_JAVA_AVAILABLE
+)
 
 
 @dataclass
@@ -244,6 +270,8 @@ class CodeParser:
             return "go"
         elif ext == ".rs":
             return "rust"
+        elif ext == ".java":
+            return "java"
         elif ext in [".json", ".yaml", ".yml", ".toml", ".md"]:
             return ext[1:]
         return "unknown"
@@ -269,6 +297,12 @@ class CodeParser:
             return cls._parse_python(file_path, content, lines)
         elif lang in ["javascript", "typescript", "tsx"]:
             return cls._parse_js_ts(file_path, content, lines, lang)
+        elif lang == "go":
+            return cls._parse_go(file_path, content, lines)
+        elif lang == "rust":
+            return cls._parse_rust(file_path, content, lines)
+        elif lang == "java":
+            return cls._parse_java(file_path, content, lines)
         else:
             return cls._parse_generic(file_path, content, lines, lang)
 
@@ -541,6 +575,290 @@ class CodeParser:
             symbols=symbols,
             all_calls=sorted(list(all_calls)),
         )
+
+    @classmethod
+    def _parse_go(cls, file_path: str, content: str, lines: List[str]) -> FileParseResult:
+        symbols: List[Symbol] = []
+        imports: List[ImportInfo] = []
+        all_calls: Set[str] = set()
+
+        if TREE_SITTER_CORE_AVAILABLE and TREE_SITTER_GO_AVAILABLE:
+            try:
+                go_lang = Language(tree_sitter_go.language())
+                parser = Parser(go_lang)
+                tree = parser.parse(content.encode("utf-8"))
+
+                def traverse(node, current_parent=None, current_symbol=None):
+                    nonlocal symbols, imports, all_calls
+                    node_type = node.type
+                    start_line = node.start_point[0] + 1
+                    end_line = node.end_point[0] + 1
+
+                    if node_type == "import_declaration":
+                        for spec in node.children:
+                            if spec.type == "import_spec_list":
+                                for s in spec.children:
+                                    if s.type == "import_spec":
+                                        p_node = s.child_by_field_name("path") or [c for c in s.children if "string" in c.type]
+                                        path_str = p_node[0].text.decode("utf-8").strip('"') if isinstance(p_node, list) and p_node else (p_node.text.decode("utf-8").strip('"') if p_node else "")
+                                        if path_str:
+                                            alias_node = s.child_by_field_name("name")
+                                            alias = alias_node.text.decode("utf-8") if alias_node else None
+                                            mod_name = path_str.split("/")[-1]
+                                            imports.append(ImportInfo(module=path_str, names=[alias or mod_name], is_from=True, alias=alias, line=start_line))
+                            elif spec.type == "import_spec":
+                                p_node = spec.child_by_field_name("path") or [c for c in spec.children if "string" in c.type]
+                                path_str = p_node[0].text.decode("utf-8").strip('"') if isinstance(p_node, list) and p_node else (p_node.text.decode("utf-8").strip('"') if p_node else "")
+                                if path_str:
+                                    alias_node = spec.child_by_field_name("name")
+                                    alias = alias_node.text.decode("utf-8") if alias_node else None
+                                    mod_name = path_str.split("/")[-1]
+                                    imports.append(ImportInfo(module=path_str, names=[alias or mod_name], is_from=True, alias=alias, line=start_line))
+
+                    elif node_type == "type_declaration":
+                        for child in node.children:
+                            if child.type == "type_spec":
+                                name_node = child.child_by_field_name("name")
+                                type_node = child.child_by_field_name("type")
+                                name = name_node.text.decode("utf-8") if name_node else "AnonymousType"
+                                kind = "struct" if type_node and type_node.type == "struct_type" else ("interface" if type_node and type_node.type == "interface_type" else "type")
+                                symbols.append(Symbol(name=name, kind=kind, line_start=start_line, line_end=end_line, signature=f"type {name} {kind}", parent=current_parent))
+
+                    elif node_type == "function_declaration":
+                        name_node = node.child_by_field_name("name")
+                        name = name_node.text.decode("utf-8") if name_node else "anonymous"
+                        params_node = node.child_by_field_name("parameters")
+                        params = params_node.text.decode("utf-8") if params_node else "()"
+                        res_node = node.child_by_field_name("result")
+                        res_str = f" {res_node.text.decode('utf-8')}" if res_node else ""
+                        sym = Symbol(name=name, kind="function", line_start=start_line, line_end=end_line, signature=f"func {name}{params}{res_str}", parent=current_parent)
+                        symbols.append(sym)
+                        for c in node.children:
+                            traverse(c, current_parent=current_parent, current_symbol=sym)
+                        return
+
+                    elif node_type == "method_declaration":
+                        name_node = node.child_by_field_name("name")
+                        name = name_node.text.decode("utf-8") if name_node else "anonymous"
+                        params_node = node.child_by_field_name("parameters")
+                        params = params_node.text.decode("utf-8") if params_node else "()"
+                        rec_node = node.child_by_field_name("receiver")
+                        rec_str = rec_node.text.decode("utf-8") if rec_node else ""
+                        res_node = node.child_by_field_name("result")
+                        res_str = f" {res_node.text.decode('utf-8')}" if res_node else ""
+                        parent_name = None
+                        if rec_node:
+                            rec_text = rec_node.text.decode("utf-8").replace("*", "").replace("(", "").replace(")", "").strip()
+                            parts = rec_text.split()
+                            if len(parts) >= 2:
+                                parent_name = parts[1]
+                            elif len(parts) == 1:
+                                parent_name = parts[0]
+                        sym = Symbol(name=name, kind="method", parent=parent_name, line_start=start_line, line_end=end_line, signature=f"func {rec_str} {name}{params}{res_str}")
+                        symbols.append(sym)
+                        for c in node.children:
+                            traverse(c, current_parent=parent_name, current_symbol=sym)
+                        return
+
+                    elif node_type == "call_expression":
+                        fn_node = node.child_by_field_name("function")
+                        if fn_node:
+                            call_name = fn_node.text.decode("utf-8")
+                            all_calls.add(call_name)
+                            if current_symbol:
+                                current_symbol.calls.append(call_name)
+
+                    for c in node.children:
+                        traverse(c, current_parent=current_parent, current_symbol=current_symbol)
+
+                traverse(tree.root_node)
+                return FileParseResult(file_path=file_path, language="go", line_count=len(lines), imports=imports, symbols=symbols, all_calls=sorted(list(all_calls)))
+            except Exception:
+                pass
+
+        # Regex fallback for Go
+        for idx, line in enumerate(lines, 1):
+            imp_m = re.search(r'import\s+(?:\w+\s+)?["\']([^"\']+)["\']', line)
+            if imp_m:
+                mod = imp_m.group(1)
+                imports.append(ImportInfo(module=mod, names=[mod.split("/")[-1]], is_from=True, line=idx))
+            fn_m = re.search(r'func\s+(?:\([^)]+\)\s+)?([A-Z]\w*)\s*\((.*?)\)', line)
+            if fn_m:
+                symbols.append(Symbol(name=fn_m.group(1), kind="function", line_start=idx, line_end=idx, signature=fn_m.group(0).strip()))
+            typ_m = re.search(r'type\s+([A-Z]\w*)\s+(struct|interface)', line)
+            if typ_m:
+                symbols.append(Symbol(name=typ_m.group(1), kind=typ_m.group(2), line_start=idx, line_end=idx, signature=typ_m.group(0).strip()))
+
+        return FileParseResult(file_path=file_path, language="go", line_count=len(lines), imports=imports, symbols=symbols, all_calls=sorted(list(all_calls)))
+
+    @classmethod
+    def _parse_rust(cls, file_path: str, content: str, lines: List[str]) -> FileParseResult:
+        symbols: List[Symbol] = []
+        imports: List[ImportInfo] = []
+        all_calls: Set[str] = set()
+
+        if TREE_SITTER_CORE_AVAILABLE and TREE_SITTER_RUST_AVAILABLE:
+            try:
+                rust_lang = Language(tree_sitter_rust.language())
+                parser = Parser(rust_lang)
+                tree = parser.parse(content.encode("utf-8"))
+
+                def traverse(node, current_parent=None, current_symbol=None):
+                    nonlocal symbols, imports, all_calls
+                    node_type = node.type
+                    start_line = node.start_point[0] + 1
+                    end_line = node.end_point[0] + 1
+
+                    if node_type == "use_declaration":
+                        arg = node.child_by_field_name("argument")
+                        imp_text = arg.text.decode("utf-8") if arg else node.text.decode("utf-8").replace("use ", "").replace(";", "").strip()
+                        mod_name = imp_text.split("::")[-1]
+                        imports.append(ImportInfo(module=imp_text, names=[mod_name], is_from=True, line=start_line))
+
+                    elif node_type in ["struct_item", "enum_item", "trait_item"]:
+                        name_node = node.child_by_field_name("name")
+                        name = name_node.text.decode("utf-8") if name_node else "Anonymous"
+                        kind = node_type.replace("_item", "")
+                        symbols.append(Symbol(name=name, kind=kind, line_start=start_line, line_end=end_line, signature=f"{kind} {name}", parent=current_parent))
+
+                    elif node_type == "impl_item":
+                        type_node = node.child_by_field_name("type")
+                        parent_name = type_node.text.decode("utf-8") if type_node else None
+                        for c in node.children:
+                            traverse(c, current_parent=parent_name, current_symbol=current_symbol)
+                        return
+
+                    elif node_type == "function_item":
+                        name_node = node.child_by_field_name("name")
+                        name = name_node.text.decode("utf-8") if name_node else "anonymous"
+                        params_node = node.child_by_field_name("parameters")
+                        params = params_node.text.decode("utf-8") if params_node else "()"
+                        ret_node = node.child_by_field_name("return_type")
+                        ret_str = f" -> {ret_node.text.decode('utf-8')}" if ret_node else ""
+                        kind = "method" if current_parent else "function"
+                        sym = Symbol(name=name, kind=kind, parent=current_parent, line_start=start_line, line_end=end_line, signature=f"fn {name}{params}{ret_str}")
+                        symbols.append(sym)
+                        for c in node.children:
+                            traverse(c, current_parent=current_parent, current_symbol=sym)
+                        return
+
+                    elif node_type == "call_expression":
+                        fn_node = node.child_by_field_name("function")
+                        if fn_node:
+                            call_name = fn_node.text.decode("utf-8")
+                            all_calls.add(call_name)
+                            if current_symbol:
+                                current_symbol.calls.append(call_name)
+
+                    elif node_type == "macro_invocation":
+                        macro_node = node.child_by_field_name("macro")
+                        if macro_node:
+                            macro_name = f"{macro_node.text.decode('utf-8')}!"
+                            all_calls.add(macro_name)
+                            if current_symbol:
+                                current_symbol.calls.append(macro_name)
+
+                    for c in node.children:
+                        traverse(c, current_parent=current_parent, current_symbol=current_symbol)
+
+                traverse(tree.root_node)
+                return FileParseResult(file_path=file_path, language="rust", line_count=len(lines), imports=imports, symbols=symbols, all_calls=sorted(list(all_calls)))
+            except Exception:
+                pass
+
+        # Regex fallback for Rust
+        for idx, line in enumerate(lines, 1):
+            use_m = re.search(r'use\s+([^;]+);', line)
+            if use_m:
+                mod = use_m.group(1).strip()
+                imports.append(ImportInfo(module=mod, names=[mod.split("::")[-1]], is_from=True, line=idx))
+            fn_m = re.search(r'(?:pub\s+)?fn\s+([A-Za-z0-9_]+)\s*\((.*?)\)', line)
+            if fn_m:
+                symbols.append(Symbol(name=fn_m.group(1), kind="function", line_start=idx, line_end=idx, signature=fn_m.group(0).strip()))
+            str_m = re.search(r'(?:pub\s+)?struct\s+([A-Za-z0-9_]+)', line)
+            if str_m:
+                symbols.append(Symbol(name=str_m.group(1), kind="struct", line_start=idx, line_end=idx, signature=str_m.group(0).strip()))
+
+        return FileParseResult(file_path=file_path, language="rust", line_count=len(lines), imports=imports, symbols=symbols, all_calls=sorted(list(all_calls)))
+
+    @classmethod
+    def _parse_java(cls, file_path: str, content: str, lines: List[str]) -> FileParseResult:
+        symbols: List[Symbol] = []
+        imports: List[ImportInfo] = []
+        all_calls: Set[str] = set()
+
+        if TREE_SITTER_CORE_AVAILABLE and TREE_SITTER_JAVA_AVAILABLE:
+            try:
+                java_lang = Language(tree_sitter_java.language())
+                parser = Parser(java_lang)
+                tree = parser.parse(content.encode("utf-8"))
+
+                def traverse(node, current_parent=None, current_symbol=None):
+                    nonlocal symbols, imports, all_calls
+                    node_type = node.type
+                    start_line = node.start_point[0] + 1
+                    end_line = node.end_point[0] + 1
+
+                    if node_type == "import_declaration":
+                        for c in node.children:
+                            if c.type in ["scoped_identifier", "identifier"]:
+                                imp_text = c.text.decode("utf-8")
+                                mod_name = imp_text.split(".")[-1]
+                                imports.append(ImportInfo(module=imp_text, names=[mod_name], is_from=True, line=start_line))
+
+                    elif node_type in ["class_declaration", "interface_declaration", "enum_declaration"]:
+                        name_node = node.child_by_field_name("name")
+                        name = name_node.text.decode("utf-8") if name_node else "Anonymous"
+                        kind = node_type.replace("_declaration", "")
+                        sym = Symbol(name=name, kind=kind, line_start=start_line, line_end=end_line, signature=f"{kind} {name}", parent=current_parent)
+                        symbols.append(sym)
+                        body_node = node.child_by_field_name("body")
+                        if body_node:
+                            for c in body_node.children:
+                                traverse(c, current_parent=name, current_symbol=None)
+                        return
+
+                    elif node_type in ["method_declaration", "constructor_declaration"]:
+                        name_node = node.child_by_field_name("name")
+                        name = name_node.text.decode("utf-8") if name_node else "anonymous"
+                        params_node = node.child_by_field_name("parameters")
+                        params = params_node.text.decode("utf-8") if params_node else "()"
+                        ret_node = node.child_by_field_name("type")
+                        ret_str = f"{ret_node.text.decode('utf-8')} " if ret_node else ""
+                        sym = Symbol(name=name, kind="method" if current_parent else "function", parent=current_parent, line_start=start_line, line_end=end_line, signature=f"{ret_str}{name}{params}")
+                        symbols.append(sym)
+                        for c in node.children:
+                            traverse(c, current_parent=current_parent, current_symbol=sym)
+                        return
+
+                    elif node_type == "method_invocation":
+                        name_node = node.child_by_field_name("name")
+                        obj_node = node.child_by_field_name("object")
+                        call_name = f"{obj_node.text.decode('utf-8')}.{name_node.text.decode('utf-8')}" if name_node and obj_node else (name_node.text.decode("utf-8") if name_node else "")
+                        if call_name:
+                            all_calls.add(call_name)
+                            if current_symbol:
+                                current_symbol.calls.append(call_name)
+
+                    for c in node.children:
+                        traverse(c, current_parent=current_parent, current_symbol=current_symbol)
+
+                traverse(tree.root_node)
+                return FileParseResult(file_path=file_path, language="java", line_count=len(lines), imports=imports, symbols=symbols, all_calls=sorted(list(all_calls)))
+            except Exception:
+                pass
+
+        # Regex fallback for Java
+        for idx, line in enumerate(lines, 1):
+            imp_m = re.search(r'import\s+([^;]+);', line)
+            if imp_m:
+                mod = imp_m.group(1).strip()
+                imports.append(ImportInfo(module=mod, names=[mod.split(".")[-1]], is_from=True, line=idx))
+            cls_m = re.search(r'(?:public\s+)?class\s+([A-Za-z0-9_]+)', line)
+            if cls_m:
+                symbols.append(Symbol(name=cls_m.group(1), kind="class", line_start=idx, line_end=idx, signature=cls_m.group(0).strip()))
+
+        return FileParseResult(file_path=file_path, language="java", line_count=len(lines), imports=imports, symbols=symbols, all_calls=sorted(list(all_calls)))
 
     @classmethod
     def _parse_generic(cls, file_path: str, content: str, lines: List[str], lang: str) -> FileParseResult:

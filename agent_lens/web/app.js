@@ -37,6 +37,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const newTaskInput = document.getElementById('newTaskInput');
   const addTaskBtn = document.getElementById('addTaskBtn');
 
+  // RepoMap
+  const repoMapBudgetInput = document.getElementById('repoMapBudgetInput');
+  const genRepoMapBtn = document.getElementById('genRepoMapBtn');
+  const copyRepoMapBtn = document.getElementById('copyRepoMapBtn');
+  const repoMapStats = document.getElementById('repoMapStats');
+  const repoMapResult = document.getElementById('repoMapResult');
+
+  // Dynamic Risk
+  const dynamicRiskSymbolInput = document.getElementById('dynamicRiskSymbolInput');
+  const runDynamicRiskBtn = document.getElementById('runDynamicRiskBtn');
+  const dynamicRiskResultsList = document.getElementById('dynamicRiskResultsList');
+
   // Guard
   const guardFileInput = document.getElementById('guardFileInput');
   const runGuardBtn = document.getElementById('runGuardBtn');
@@ -774,6 +786,71 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // --- RepoMap ---
+  if (genRepoMapBtn) {
+    genRepoMapBtn.addEventListener('click', async () => {
+      const budget = parseInt(repoMapBudgetInput.value, 10) || 1024;
+      repoMapStats.textContent = 'Computing PageRank & symbol tree...';
+      try {
+        const res = await fetch(`/api/repomap?budget=${budget}`);
+        const data = await res.json();
+        repoMapResult.value = data.map_content;
+        repoMapStats.textContent = `RepoMap: ${data.files_included}/${data.total_files} files, ${data.symbols_included} symbols (~${data.estimated_tokens} tokens)`;
+        showToast("RepoMap Generated!");
+      } catch (e) {
+        repoMapStats.textContent = "Error generating RepoMap.";
+      }
+    });
+  }
+
+  if (copyRepoMapBtn) {
+    copyRepoMapBtn.addEventListener('click', () => {
+      if (repoMapResult.value) {
+        navigator.clipboard.writeText(repoMapResult.value);
+        showToast("RepoMap copied to clipboard!");
+      }
+    });
+  }
+
+  // --- Dynamic Risk ---
+  if (runDynamicRiskBtn) {
+    runDynamicRiskBtn.addEventListener('click', async () => {
+      const symbol = dynamicRiskSymbolInput.value.trim();
+      if (!symbol) return;
+      dynamicRiskResultsList.innerHTML = '<div style="color:var(--text-dim);padding:12px;">Auditing symbol across AST & dynamic references...</div>';
+      try {
+        const res = await fetch(`/api/dynamic-risk?symbol=${encodeURIComponent(symbol)}`);
+        const data = await res.json();
+        dynamicRiskResultsList.innerHTML = '';
+        const header = document.createElement('div');
+        header.style.padding = '8px 12px';
+        header.style.fontSize = '0.85rem';
+        header.innerHTML = `<strong>Dynamic Risk:</strong> <span class="risk-pill ${data.dynamic_risk_level.toLowerCase()}">${data.dynamic_risk_level}</span> (${data.total_unverified_references} unverified dynamic references)`;
+        dynamicRiskResultsList.appendChild(header);
+
+        if (data.findings && data.findings.length > 0) {
+          data.findings.forEach(f => {
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            card.innerHTML = `
+              <div class="item-top">
+                <span class="action-badge ${f.severity === 'HIGH' ? 'CREATE' : 'UPDATE'}">${f.severity}</span>
+                <span style="font-size:0.75rem;color:var(--text-dim)">${escapeHtml(f.file)}:${f.line}</span>
+              </div>
+              <div style="font-size:0.8rem;color:var(--text-main);margin:4px 0;">${escapeHtml(f.detail)}</div>
+              ${f.snippet ? `<div class="item-notes"><code>${escapeHtml(f.snippet)}</code></div>` : ''}
+            `;
+            dynamicRiskResultsList.appendChild(card);
+          });
+        } else {
+          dynamicRiskResultsList.innerHTML += '<div style="color:var(--accent-green);padding:12px;">No unverified dynamic reflection or duck typing detected for this symbol.</div>';
+        }
+      } catch (e) {
+        dynamicRiskResultsList.innerHTML = '<div style="color:var(--accent-red);padding:12px;">Dynamic risk audit failed.</div>';
+      }
+    });
+  }
+
   // --- Port Sentinel ---
   refreshPortsBtn.addEventListener('click', fetchPorts);
   window.killPort = async (port) => {
@@ -782,7 +859,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/api/ports/kill', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ port }),
+        body: JSON.stringify({ port, confirm: true }),
       });
       const data = await res.json();
       showToast(data.message);

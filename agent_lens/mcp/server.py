@@ -13,6 +13,9 @@ from ..core.planner import RefactorPlanner
 from ..core.preflight import PreflightChecker
 from ..core.shadow import GitShadowSandbox
 from ..core.delegation import DelegationContractGenerator
+from ..core.repomap import RepoMapGenerator
+from ..core.dynamic_risk import DynamicRiskDetector
+from ..core.sentinel import PortSentinel
 
 
 class AgentLensMCPServer:
@@ -30,6 +33,8 @@ class AgentLensMCPServer:
         self.planner = RefactorPlanner(self.cart)
         self.shadow = GitShadowSandbox(self.cart)
         self.delegation = DelegationContractGenerator(self.cart)
+        self.repomap = RepoMapGenerator(self.cart)
+        self.dynamic_risk = DynamicRiskDetector(self.cart)
 
     def get_tool_definitions(self) -> List[Dict[str, Any]]:
         return [
@@ -178,6 +183,42 @@ class AgentLensMCPServer:
                     },
                     "required": ["action"]
                 }
+            },
+            {
+                "name": "lens_get_repo_map",
+                "description": "Returns an Aider-style, PageRank-weighted, token-budgeted (<1,024 tokens) structural outline of the entire codebase with key classes and exported signatures.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "token_budget": {"type": "integer", "description": "Maximum token budget (default: 1024)."},
+                        "format": {"type": "string", "enum": ["compact", "json"], "description": "Output format: 'compact' (dense text, default) or 'json'."}
+                    }
+                }
+            },
+            {
+                "name": "lens_audit_dynamic_risk",
+                "description": "Audits a symbol or method across the codebase for runtime dynamic dispatch, getattr/hasattr reflection, and duck-typing attribute access that static AST misses.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {"type": "string", "description": "The symbol or method name to audit."},
+                        "file": {"type": "string", "description": "Optional file path hint."}
+                    },
+                    "required": ["symbol"]
+                }
+            },
+            {
+                "name": "lens_kill_port",
+                "description": "Safely terminates a rogue or zombie developer process listening on a specified port with mandatory confirmation guard.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "port": {"type": "integer", "description": "The port number to inspect or terminate."},
+                        "confirm": {"type": "boolean", "description": "Explicit confirmation to kill the process. Must be true to execute."},
+                        "force_non_dev": {"type": "boolean", "description": "Override protection for non-standard dev ports."}
+                    },
+                    "required": ["port"]
+                }
             }
         ]
 
@@ -325,6 +366,33 @@ class AgentLensMCPServer:
             elif act == "update_scratchpad":
                 self.memory.update_scratchpad(arguments["content"], updated_by="agent")
                 return {"content": [{"type": "text", "text": "Scratchpad updated."}]}
+
+        elif tool_name == "lens_get_repo_map":
+            budget = arguments.get("token_budget", 1024)
+            res = self.repomap.generate_repo_map(token_budget=budget)
+            if fmt == "compact":
+                text = (
+                    f"{res['map_content']}\n\n"
+                    f"[RepoMap: {res['files_included']}/{res['total_files']} files, "
+                    f"{res['symbols_included']} symbols, ~{res['estimated_tokens']} tokens]"
+                )
+            else:
+                text = json.dumps(res, indent=2)
+            return {"content": [{"type": "text", "text": text}]}
+
+        elif tool_name == "lens_audit_dynamic_risk":
+            res = self.dynamic_risk.audit_symbol_dynamic_risk(
+                arguments["symbol"],
+                target_file=arguments.get("file")
+            )
+            return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+
+        elif tool_name == "lens_kill_port":
+            port = int(arguments["port"])
+            confirm = bool(arguments.get("confirm", False))
+            force = bool(arguments.get("force_non_dev", False))
+            res = PortSentinel.kill_port(port, force_non_dev=force, confirm=confirm)
+            return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
 
         return {"content": [{"type": "text", "text": f"Unknown tool: {tool_name}"}], "isError": True}
 

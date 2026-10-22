@@ -14,6 +14,8 @@ from .core.planner import RefactorPlanner
 from .core.report import ArchitectureReporter
 from .core.shadow import GitShadowSandbox
 from .core.delegation import DelegationContractGenerator
+from .core.repomap import RepoMapGenerator
+from .core.dynamic_risk import DynamicRiskDetector
 
 
 def main():
@@ -103,8 +105,23 @@ def main():
     ports_parser.add_argument("--json", action="store_true", help="Output raw JSON")
 
     # kill-port
-    kill_parser = subparsers.add_parser("kill-port", help="Terminate process occupying a port")
+    kill_parser = subparsers.add_parser("kill-port", help="Terminate process occupying a port (requires --confirm)")
     kill_parser.add_argument("port", type=int, help="Port to terminate")
+    kill_parser.add_argument("--confirm", action="store_true", help="Explicitly confirm process termination")
+    kill_parser.add_argument("--force-non-dev", action="store_true", help="Allow killing processes on non-standard developer ports")
+
+    # repomap (Aider-style PageRank repo map)
+    repomap_parser = subparsers.add_parser("repomap", help="Generate PageRank-weighted token-budgeted repo map")
+    repomap_parser.add_argument("--budget", "-b", type=int, default=1024, help="Maximum token budget (default: 1024)")
+    repomap_parser.add_argument("--root", default=".", help="Root directory (default: .)")
+    repomap_parser.add_argument("--json", action="store_true", help="Output raw JSON")
+
+    # dynamic-risk
+    risk_parser = subparsers.add_parser("dynamic-risk", help="Audit dynamic dispatch, reflection, and duck typing risks for a symbol")
+    risk_parser.add_argument("symbol", help="Target symbol name to audit")
+    risk_parser.add_argument("--file", "-f", help="Target file path hint")
+    risk_parser.add_argument("--root", default=".", help="Root directory (default: .)")
+    risk_parser.add_argument("--json", action="store_true", help="Output raw JSON")
 
     # preflight
     preflight_parser = subparsers.add_parser("preflight", help="Validate file syntax, imports, and conflict markers")
@@ -383,9 +400,44 @@ def main():
                 print(f"Port {p['port']:<6} | PID {p['pid']:<6} | {p['process_name']}")
 
     elif args.command == "kill-port":
-        res = PortSentinel.kill_port(args.port)
-        status_sym = "✓" if res["success"] else "✗"
-        print(f"[{status_sym}] {res['message']}")
+        res = PortSentinel.kill_port(args.port, force_non_dev=args.force_non_dev, confirm=args.confirm)
+        if res.get("requires_confirmation"):
+            print(f"[!] CONFIRMATION REQUIRED: Process '{res['process']}' (PID {res['pid']}) is listening on port {res['port']}.")
+            print(f"    Rerun with '--confirm' to proceed with termination:")
+            print(f"    agent-lens kill-port {args.port} --confirm" + (" --force-non-dev" if args.force_non_dev else ""))
+        else:
+            status_sym = "✓" if res["success"] else "✗"
+            print(f"[{status_sym}] {res['message']}")
+
+    elif args.command == "repomap":
+        cart = CodebaseCartographer(args.root)
+        cart.scan()
+        generator = RepoMapGenerator(cart)
+        res = generator.generate_repo_map(token_budget=args.budget)
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            print(res["map_content"])
+            print(f"\n[RepoMap: {res['files_included']}/{res['total_files']} files, {res['symbols_included']} symbols, ~{res['estimated_tokens']} tokens (budget: {res['token_budget']})]")
+
+    elif args.command == "dynamic-risk":
+        cart = CodebaseCartographer(args.root)
+        cart.scan()
+        detector = DynamicRiskDetector(cart)
+        res = detector.audit_symbol_dynamic_risk(args.symbol, target_file=args.file)
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            print(f"=== Dynamic Risk Audit: `{args.symbol}` (Risk: **{res['dynamic_risk_level']}**) ===")
+            print(f"Total Unverified References: {res['total_unverified_references']}")
+            for finding in res["findings"]:
+                print(f"  [{finding['severity']}] {finding['file']}:{finding['line']} - {finding['detail']}")
+                if finding.get("snippet"):
+                    print(f"        `{finding['snippet']}`")
+            if res.get("caveats"):
+                print("\nCaveats:")
+                for c in res["caveats"]:
+                    print(f"  - {c}")
 
     elif args.command == "preflight":
         res = PreflightChecker.check_file(args.file)

@@ -17,6 +17,9 @@ def test_mcp_server_tool_definitions():
         assert "lens_verify_hallucinations" in tool_names
         assert "lens_plan_refactor" in tool_names
         assert "lens_manage_memory" in tool_names
+        assert "lens_get_repo_map" in tool_names
+        assert "lens_audit_dynamic_risk" in tool_names
+        assert "lens_kill_port" in tool_names
 
 
 def test_mcp_server_tool_call_execution():
@@ -40,3 +43,17 @@ def test_mcp_server_tool_call_execution():
             "status": "exploring"
         })
         assert "Created hypothesis" in mem_res["content"][0]["text"]
+
+        # Call lens_get_repo_map
+        map_res = server.handle_call_tool("lens_get_repo_map", {"token_budget": 500})
+        assert "content" in map_res
+        assert "REPOSITORY STRUCTURE MAP" in map_res["content"][0]["text"]
+
+        # Call lens_audit_dynamic_risk
+        risk_res = server.handle_call_tool("lens_audit_dynamic_risk", {"symbol": "sample_function"})
+        assert "content" in risk_res
+        assert "dynamic_risk_level" in risk_res["content"][0]["text"]
+
+        # Call lens_kill_port without confirmation (should require confirmation)
+        kill_res = server.handle_call_tool("lens_kill_port", {"port": 9999, "confirm": False})
+        assert "content" in kill_res
