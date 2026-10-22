@@ -3,6 +3,8 @@ import shutil
 import subprocess
 import time
 import uuid
+import shlex
+import sys
 from typing import Dict, List, Optional, Any
 from .cartography import CodebaseCartographer
 from .security import resolve_safe_path
@@ -68,14 +70,44 @@ class GitShadowSandbox:
                     f.write(content)
                 patched_files.append(rel_file)
 
-            # 3. Execute test suite in isolated sandbox
+            # 3. Security check: validate test command does not attempt raw shell invocation
+            if isinstance(test_command, str):
+                cmd_args = shlex.split(test_command, posix=True)
+            else:
+                cmd_args = list(test_command)
+
+            if not cmd_args:
+                return {
+                    "success": False,
+                    "exit_code": -1,
+                    "duration_seconds": 0.0,
+                    "sandbox_id": sandbox_id,
+                    "patched_files": patched_files,
+                    "test_command": test_command,
+                    "stdout": "",
+                    "stderr": "Security rejection: Empty test command.",
+                }
+
+            binary_name = os.path.basename(cmd_args[0]).lower()
+            if binary_name in ["cmd.exe", "powershell.exe", "pwsh.exe", "bash.exe", "sh.exe", "cmd", "powershell", "pwsh", "bash", "sh"]:
+                return {
+                    "success": False,
+                    "exit_code": -1,
+                    "duration_seconds": 0.0,
+                    "sandbox_id": sandbox_id,
+                    "patched_files": patched_files,
+                    "test_command": test_command,
+                    "stdout": "",
+                    "stderr": f"Security rejection: Direct invocation of shell binary '{binary_name}' is disallowed in shadow sandbox.",
+                }
+
             run_res = subprocess.run(
-                test_command,
+                cmd_args,
                 cwd=sandbox_path,
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                shell=True,
+                shell=False,
             )
             duration = round(time.time() - start_time, 3)
 

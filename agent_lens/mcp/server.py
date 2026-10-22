@@ -25,7 +25,9 @@ class AgentLensMCPServer:
         self.root_dir = os.path.realpath(os.path.abspath(root_dir))
         self.cart = CodebaseCartographer(self.root_dir)
         self.cart.scan()
-        self.memory = AgentMemory()
+        mem_dir = os.path.join(self.root_dir, ".agentlens")
+        os.makedirs(mem_dir, exist_ok=True)
+        self.memory = AgentMemory(db_path=os.path.join(mem_dir, "memory.db"))
         self.packer = ContextPacker(self.cart)
         self.sandbox = GhostPatchSandbox(self.cart)
         self.guard = HallucinationGuard(self.cart)
@@ -281,7 +283,9 @@ class AgentLensMCPServer:
             return {"content": [{"type": "text", "text": briefing["markdown"]}]}
 
         elif tool_name == "lens_verify_hallucinations":
-            res = self.guard.verify_patch_hallucinations(arguments["file"], content=arguments.get("content"))
+            target_file = arguments.get("file") or arguments.get("file_path", "")
+            content = arguments.get("content") or arguments.get("proposed_code")
+            res = self.guard.verify_patch_hallucinations(target_file, content=content)
             return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
 
         elif tool_name == "lens_plan_refactor":
@@ -396,6 +400,66 @@ class AgentLensMCPServer:
 
         return {"content": [{"type": "text", "text": f"Unknown tool: {tool_name}"}], "isError": True}
 
+    def handle_jsonrpc(self, msg: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Processes a single JSON-RPC 2.0 message."""
+        msg_id = msg.get("id")
+        method = msg.get("method", "")
+        params = msg.get("params", {})
+
+        if method == "initialize":
+            return {
+                "jsonrpc": "2.0",
+                "id": msg_id,
+                "result": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {"tools": {}},
+                    "serverInfo": {"name": "agent-lens", "version": "1.1.0"}
+                }
+            }
+
+        elif method == "ping":
+            return {"jsonrpc": "2.0", "id": msg_id, "result": {}}
+
+        elif method.startswith("notifications/"):
+            # Notifications do not return responses
+            return None
+
+        elif method == "tools/list":
+            return {
+                "jsonrpc": "2.0",
+                "id": msg_id,
+                "result": {"tools": self.get_tool_definitions()}
+            }
+
+        elif method == "tools/call":
+            tool_name = params.get("name")
+            args = params.get("arguments", {})
+            try:
+                res = self.handle_call_tool(tool_name, args)
+                return {
+                    "jsonrpc": "2.0",
+                    "id": msg_id,
+                    "result": res
+                }
+            except Exception as e:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": msg_id,
+                    "result": {
+                        "content": [{"type": "text", "text": f"Error executing tool '{tool_name}': {str(e)}"}],
+                        "isError": True
+                    }
+                }
+
+        else:
+            if msg_id is not None:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": msg_id,
+                    "error": {"code": -32601, "message": f"Method not found: {method}"}
+                }
+            return None
+
     def run_stdio(self):
         """Standard IO JSON-RPC 2.0 loop for Model Context Protocol."""
         for line in sys.stdin:
@@ -405,43 +469,17 @@ class AgentLensMCPServer:
             try:
                 msg = json.loads(line)
             except json.JSONDecodeError:
+                resp = {
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {"code": -32700, "message": "Parse error"}
+                }
+                sys.stdout.write(json.dumps(resp) + "\n")
+                sys.stdout.flush()
                 continue
 
-            msg_id = msg.get("id")
-            method = msg.get("method")
-            params = msg.get("params", {})
-
-            if method == "initialize":
-                resp = {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "result": {
-                        "protocolVersion": "2024-11-05",
-                        "capabilities": {"tools": {}},
-                        "serverInfo": {"name": "agent-lens", "version": "1.1.0"}
-                    }
-                }
-                sys.stdout.write(json.dumps(resp) + "\n")
-                sys.stdout.flush()
-
-            elif method == "tools/list":
-                resp = {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "result": {"tools": self.get_tool_definitions()}
-                }
-                sys.stdout.write(json.dumps(resp) + "\n")
-                sys.stdout.flush()
-
-            elif method == "tools/call":
-                tool_name = params.get("name")
-                args = params.get("arguments", {})
-                res = self.handle_call_tool(tool_name, args)
-                resp = {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "result": res
-                }
+            resp = self.handle_jsonrpc(msg)
+            if resp is not None:
                 sys.stdout.write(json.dumps(resp) + "\n")
                 sys.stdout.flush()
 

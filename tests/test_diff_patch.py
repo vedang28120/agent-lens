@@ -36,3 +36,20 @@ def public_endpoint():
         )
         assert bad_verdict["verdict"] == "REJECTED"
         assert "not found" in bad_verdict["error"].lower()
+
+        # 3. Unified diff hunk application (ensuring surrounding file content is preserved)
+        diff_patch = """--- a/api.py
++++ b/api.py
+@@ -1,3 +1,3 @@
+ def public_endpoint():
+-    return "OLD_RESULT"
++    return "HUNK_RESULT"
+"""
+        diff_verdict = sandbox.dry_run_patch_diff(
+            "api.py",
+            diff_patch=diff_patch,
+        )
+        assert diff_verdict["verdict"] == "SAFE"
+        assert diff_verdict["safety_score"] >= 85
+        # Ensure the file still has def public_endpoint() intact and didn't truncate
+        assert diff_verdict["net_lines"] == 0

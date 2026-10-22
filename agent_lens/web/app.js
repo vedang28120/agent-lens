@@ -123,7 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       valFiles.textContent = data.files_count || 0;
       valSymbols.textContent = data.symbols_count || 0;
-      valHypo.textContent = data.hypotheses_count || 0;
+      valHypo.textContent = data.hypotheses_count !== undefined ? data.hypotheses_count : 0;
+      if (valPorts) valPorts.textContent = data.ports_count !== undefined ? data.ports_count : '--';
     } catch (e) {
       console.error("Status fetch error", e);
     }
@@ -396,16 +397,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function initGraph(data) {
     const nodeMap = new Map();
+    const count = data.nodes.length;
     const nodes = data.nodes.map((n, i) => {
-      const angle = (i / data.nodes.length) * 2 * Math.PI;
-      const radius = 140 + Math.random() * 100;
+      // Golden spiral initial dispersion
+      const angle = i * 2.39996;
+      const dist = 70 + Math.sqrt(i) * 55;
       const node = {
         ...n,
-        x: (width / 2) + Math.cos(angle) * radius,
-        y: (height / 2) + Math.sin(angle) * radius,
+        x: (width / 2) + Math.cos(angle) * dist,
+        y: (height / 2) + Math.sin(angle) * dist,
         vx: 0,
         vy: 0,
-        radius: Math.max(6, Math.min(18, 6 + (n.dependents_count || 0) * 3)),
+        radius: Math.max(7, Math.min(15, 7 + (n.dependents_count || 0) * 1.2)),
       };
       nodeMap.set(n.id, node);
       return node;
@@ -417,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
     })).filter(l => typeof l.source === 'object' && typeof l.target === 'object');
 
     graphData = { nodes, links };
-    transform = { x: 0, y: 0, k: 1 };
+    transform = { x: 0, y: 0, k: 0.9 };
   }
 
   function simulatePhysics() {
@@ -425,15 +428,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const links = graphData.links;
     if (!nodes.length) return;
 
+    // 1. Repulsion & Collision Avoidance
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const dx = nodes[j].x - nodes[i].x;
         const dy = nodes[j].y - nodes[i].y;
         const distSq = dx * dx + dy * dy || 1;
-        if (distSq < 40000) {
-          const force = 300 / distSq;
-          const fx = (dx / Math.sqrt(distSq)) * force;
-          const fy = (dy / Math.sqrt(distSq)) * force;
+        const dist = Math.sqrt(distSq);
+
+        // Hard collision avoidance buffer
+        const minDist = nodes[i].radius + nodes[j].radius + 36;
+        if (dist < minDist) {
+          const overlap = (minDist - dist) * 0.35;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          nodes[i].vx -= nx * overlap;
+          nodes[i].vy -= ny * overlap;
+          nodes[j].vx += nx * overlap;
+          nodes[j].vy += ny * overlap;
+        }
+
+        // Long-range electrostatic repulsion
+        if (dist < 400) {
+          const repForce = 2200 / (distSq + 200);
+          const fx = (dx / dist) * repForce;
+          const fy = (dy / dist) * repForce;
           nodes[i].vx -= fx;
           nodes[i].vy -= fy;
           nodes[j].vx += fx;
@@ -442,11 +461,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // 2. Spring Links
     for (const l of links) {
       const dx = l.target.x - l.source.x;
       const dy = l.target.y - l.source.y;
       const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const force = (dist - 90) * 0.03;
+      const targetDist = 130;
+      const force = (dist - targetDist) * 0.02;
       const fx = (dx / dist) * force;
       const fy = (dy / dist) * force;
       l.source.vx += fx;
@@ -455,14 +476,15 @@ document.addEventListener('DOMContentLoaded', () => {
       l.target.vy -= fy;
     }
 
+    // 3. Ultra-soft Centering Gravity & Friction
     const cx = width / 2;
     const cy = height / 2;
     for (const n of nodes) {
       if (n === draggedNode) continue;
-      n.vx += (cx - n.x) * 0.005;
-      n.vy += (cy - n.y) * 0.005;
-      n.vx *= 0.85;
-      n.vy *= 0.85;
+      n.vx += (cx - n.x) * 0.0006;
+      n.vy += (cy - n.y) * 0.0006;
+      n.vx *= 0.86;
+      n.vy *= 0.86;
       n.x += n.vx;
       n.y += n.vy;
     }
@@ -472,45 +494,70 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.save();
     ctx.clearRect(0, 0, width, height);
 
+    // Subtle space grid dots for Mission Control aesthetic
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+    const gridStep = 40;
+    for (let gx = 0; gx < width; gx += gridStep) {
+      for (let gy = 0; gy < height; gy += gridStep) {
+        ctx.fillRect(gx, gy, 1, 1);
+      }
+    }
+
     ctx.translate(transform.x, transform.y);
     ctx.scale(transform.k, transform.k);
 
+    // Links
     for (const l of graphData.links) {
       const isHigh = highlightedNodes.has(l.source.id) && highlightedNodes.has(l.target.id);
       ctx.beginPath();
       ctx.moveTo(l.source.x, l.source.y);
       ctx.lineTo(l.target.x, l.target.y);
-      ctx.strokeStyle = isHigh ? 'rgba(239, 68, 68, 0.8)' : 'rgba(59, 130, 246, 0.18)';
+      ctx.strokeStyle = isHigh ? 'rgba(239, 68, 68, 0.85)' : 'rgba(79, 172, 254, 0.22)';
       ctx.lineWidth = isHigh ? 2 : 1;
       ctx.stroke();
     }
 
+    // Nodes
     for (const n of graphData.nodes) {
       const isSelected = selectedNode && selectedNode.id === n.id;
       const isHighlighted = highlightedNodes.has(n.id);
 
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.radius, 0, 2 * Math.PI);
-
-      let color = '#10b981';
-      if (n.dependents_count >= 3) color = '#ef4444';
-      else if (n.dependents_count >= 1) color = '#f59e0b';
+      let color = '#10b981'; // green / low blast
+      if (n.dependents_count >= 4) color = '#ef4444'; // red / high blast
+      else if (n.dependents_count >= 1) color = '#f59e0b'; // amber / medium
 
       if (isHighlighted) color = '#ef4444';
 
-      ctx.fillStyle = color;
-      ctx.shadowColor = isSelected || isHighlighted ? color : 'transparent';
-      ctx.shadowBlur = isSelected || isHighlighted ? 15 : 0;
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      // Outer glow ring on selected / high blast
+      if (isSelected || isHighlighted || n.dependents_count >= 4) {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.radius + 4, 0, 2 * Math.PI);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
 
-      ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(255,255,255,0.2)';
+      // Core node circle
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.3)';
       ctx.lineWidth = isSelected ? 2 : 1;
       ctx.stroke();
 
+      // Clean, high-contrast label with dark backdrop stroke
       ctx.font = '10px "Fira Code", monospace';
-      ctx.fillStyle = isSelected ? '#00f2fe' : '#94a3b8';
       ctx.textAlign = 'center';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#090c12';
+      ctx.strokeText(n.name, n.x, n.y + n.radius + 12);
+
+      ctx.fillStyle = isSelected ? '#00f2fe' : (isHighlighted ? '#fca5a5' : '#cbd5e1');
       ctx.fillText(n.name, n.x, n.y + n.radius + 12);
     }
 

@@ -411,30 +411,50 @@ body {
   display: flex;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
-  padding: 0 12px;
+  padding: 0 10px;
   gap: 4px;
   flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-subtle) transparent;
+}
+
+.tab-bar::-webkit-scrollbar {
+  height: 3px;
+}
+.tab-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tab-bar::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
 }
 
 .tab-btn {
   background: none;
   border: none;
   color: var(--text-muted);
-  padding: 10px 14px;
-  font-size: 0.78rem;
+  padding: 9px 12px;
+  font-size: 0.76rem;
   font-weight: 500;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab-btn:hover {
   color: var(--text-main);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .tab-btn.active {
   color: var(--accent-cyan);
   border-bottom-color: var(--accent-cyan);
+  background: rgba(0, 242, 254, 0.05);
 }
 
 .tab-content {

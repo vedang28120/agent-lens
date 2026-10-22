@@ -124,11 +124,17 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
         # 2. API: System Status & Metrics
         if path == "/api/status":
             symbols_count = sum(len(v) for v in self.cartographer.symbol_index.values())
+            hypos = self.memory.get_hypotheses()
+            tasks = self.memory.get_tasks()
+            ports = [p for p in PortSentinel.list_listening_ports() if p.get("is_dev_port")]
             res = {
                 "status": "online",
                 "root_path": self.cartographer.root_path,
                 "files_count": len(self.cartographer.file_results),
                 "symbols_count": symbols_count,
+                "hypotheses_count": len(hypos),
+                "tasks_count": len(tasks),
+                "ports_count": len(ports),
                 "version": "1.1.0",
                 "timestamp": time.time(),
             }

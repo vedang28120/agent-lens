@@ -57,3 +57,38 @@ def test_mcp_server_tool_call_execution():
         # Call lens_kill_port without confirmation (should require confirmation)
         kill_res = server.handle_call_tool("lens_kill_port", {"port": 9999, "confirm": False})
         assert "content" in kill_res
+
+        # Call lens_verify_hallucinations (Condition 1 check)
+        guard_res = server.handle_call_tool("lens_verify_hallucinations", {
+            "file_path": "core.py",
+            "proposed_code": "def sample_function():\n    return 'test_slice'\n"
+        })
+        assert "content" in guard_res
+
+
+def test_mcp_jsonrpc_protocol_compliance():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        server = AgentLensMCPServer(root_dir=tmpdir)
+
+        # 1. ping
+        ping_resp = server.handle_jsonrpc({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "ping"
+        })
+        assert ping_resp == {"jsonrpc": "2.0", "id": 1, "result": {}}
+
+        # 2. notification (no id)
+        notif_resp = server.handle_jsonrpc({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+        })
+        assert notif_resp is None
+
+        # 3. method not found (-32601)
+        err_resp = server.handle_jsonrpc({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "unknown_rpc_method"
+        })
+        assert err_resp["error"]["code"] == -32601

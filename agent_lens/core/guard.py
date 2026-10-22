@@ -173,3 +173,6 @@ class HallucinationGuard:
         if match and match[1] >= 65:
             return match[0]
         return None
+
+    # Alias for MCP server and API compatibility
+    verify_patch_hallucinations = verify_file

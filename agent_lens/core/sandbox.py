@@ -188,23 +188,88 @@ class GhostPatchSandbox:
             return self.dry_run_patch(norm_file, proposed_content)
 
         elif diff_patch is not None:
-            # Simple unified patch simulator
-            lines = original_content.splitlines(keepends=True)
+            # Parse unified diff hunks and apply them to original content
             patch_lines = diff_patch.splitlines(keepends=True)
-            # Apply basic +/- hunks
-            new_lines = []
-            skip_count = 0
+            current_old = []
+            current_new = []
+            hunks = []
+            in_hunk = False
+
             for pline in patch_lines:
-                if pline.startswith("---") or pline.startswith("+++") or pline.startswith("@@"):
+                if pline.startswith("---") or pline.startswith("+++"):
                     continue
-                elif pline.startswith("-"):
+                if pline.startswith("@@"):
+                    if in_hunk and (current_old or current_new):
+                        hunks.append(("".join(current_old), "".join(current_new)))
+                        current_old = []
+                        current_new = []
+                    in_hunk = True
                     continue
-                elif pline.startswith("+"):
-                    new_lines.append(pline[1:])
-                elif pline.startswith(" "):
-                    new_lines.append(pline[1:])
-            
-            proposed = "".join(new_lines) if new_lines else original_content
+                if in_hunk:
+                    if pline.startswith("-"):
+                        current_old.append(pline[1:])
+                    elif pline.startswith("+"):
+                        current_new.append(pline[1:])
+                    elif pline.startswith(" "):
+                        current_old.append(pline[1:])
+                        current_new.append(pline[1:])
+                    elif pline.strip() == "":
+                        current_old.append(pline)
+                        current_new.append(pline)
+
+            if in_hunk and (current_old or current_new):
+                hunks.append(("".join(current_old), "".join(current_new)))
+
+            if not hunks:
+                # If no @@ header found, check if it's a simple raw diff without headers
+                for pline in patch_lines:
+                    if pline.startswith("-"):
+                        current_old.append(pline[1:])
+                    elif pline.startswith("+"):
+                        current_new.append(pline[1:])
+                    elif pline.startswith(" "):
+                        current_old.append(pline[1:])
+                        current_new.append(pline[1:])
+                if current_old or current_new:
+                    hunks.append(("".join(current_old), "".join(current_new)))
+
+            if not hunks:
+                return {
+                    "verdict": "REJECTED",
+                    "safety_score": 0,
+                    "file": norm_file,
+                    "error": "Could not parse any valid hunks from diff_patch.",
+                    "breakages": ["Invalid diff format"],
+                    "added_symbols": [],
+                    "removed_symbols": [],
+                    "modified_symbols": [],
+                }
+
+            proposed = original_content
+            for old_hunk, new_hunk in hunks:
+                if old_hunk and old_hunk not in proposed:
+                    # Handle CRLF vs LF normalization
+                    norm_old = old_hunk.replace("\r\n", "\n")
+                    norm_prop = proposed.replace("\r\n", "\n")
+                    if norm_old in norm_prop:
+                        norm_new = new_hunk.replace("\r\n", "\n")
+                        proposed = norm_prop.replace(norm_old, norm_new, 1)
+                    else:
+                        return {
+                            "verdict": "REJECTED",
+                            "safety_score": 0,
+                            "file": norm_file,
+                            "error": f"Hunk target could not be located in {norm_file}.",
+                            "breakages": ["Hunk mismatch in patch application"],
+                            "added_symbols": [],
+                            "removed_symbols": [],
+                            "modified_symbols": [],
+                        }
+                elif old_hunk:
+                    proposed = proposed.replace(old_hunk, new_hunk, 1)
+                else:
+                    proposed = proposed + new_hunk
+
             return self.dry_run_patch(norm_file, proposed)
 
         return {
