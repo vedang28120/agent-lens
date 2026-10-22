@@ -445,7 +445,8 @@ def main():
             print(json.dumps(res, indent=2))
         else:
             status_str = "✓ PASS" if res["valid"] else "✗ FAIL"
-            print(f"Preflight Check: {args.file} [{status_str}]")
+            dir_info = f" ({res['checked_files']} files checked)" if res.get("is_directory") else ""
+            print(f"Preflight Check: {args.file} [{status_str}]{dir_info}")
             for err in res["errors"]:
                 print(f"  [ERROR] {err}")
             for warn in res["warnings"]:
