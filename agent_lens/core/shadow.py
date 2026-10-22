@@ -53,6 +53,46 @@ class GitShadowSandbox:
             )
             if git_res.returncode == 0:
                 is_git_worktree = True
+                # Sync uncommitted changes (staged and unstaged) so tests run against
+                # the developer's live working tree + proposed patch, not stale HEAD.
+                try:
+                    diff_proc = subprocess.run(
+                        ["git", "diff", "HEAD"],
+                        cwd=self.cart.root_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if diff_proc.returncode == 0 and diff_proc.stdout.strip():
+                        subprocess.run(
+                            ["git", "apply", "--whitespace=nowarn"],
+                            input=diff_proc.stdout,
+                            cwd=sandbox_path,
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
+                        )
+                    # Also sync untracked non-ignored files
+                    status_proc = subprocess.run(
+                        ["git", "status", "--porcelain"],
+                        cwd=self.cart.root_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if status_proc.returncode == 0:
+                        for line in status_proc.stdout.splitlines():
+                            if line.startswith("?? "):
+                                rel_untracked = line[3:].strip()
+                                if rel_untracked.startswith(".agentlens") or rel_untracked.startswith(".git"):
+                                    continue
+                                src = os.path.join(self.cart.root_path, rel_untracked)
+                                dst = os.path.join(sandbox_path, rel_untracked)
+                                if os.path.isfile(src):
+                                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                                    shutil.copy2(src, dst)
+                except Exception:
+                    pass
             else:
                 # Fallback: file copy if not a git repo or worktree fails
                 shutil.copytree(

@@ -13,7 +13,10 @@ class DynamicRiskDetector:
 
     COMMON_NOISY_SYMBOLS: Set[str] = {
         "get", "set", "run", "id", "name", "type", "key", "value", "data", "test",
-        "init", "call", "start", "stop", "handle", "update", "delete", "create"
+        "init", "call", "start", "stop", "handle", "update", "delete", "create",
+        "items", "keys", "values", "append", "extend", "pop", "clear", "copy",
+        "read", "write", "close", "open", "send", "recv", "format", "parse",
+        "dump", "load", "dumps", "loads", "execute", "commit", "connect", "main"
     }
 
     NON_CODE_EXTENSIONS: Set[str] = {
@@ -109,7 +112,8 @@ class DynamicRiskDetector:
                             })
 
             # 3. Python AST Loose Attribute Access (Duck Typing)
-            if parse_res.language == "python":
+            # Suppress generic attribute access for common method names like .get(), .run(), .items() to eliminate noise
+            if parse_res.language == "python" and not is_common_name:
                 try:
                     tree = ast.parse(content, filename=file_path)
                     for node in ast.walk(tree):

@@ -1,0 +1,10 @@
+# AgentLens Protocol Rules for AI Coding Agents
+
+When working in this repository with AgentLens MCP tools:
+1. Use `lens_get_repo_map` instead of recursively reading directories.
+2. Use `lens_get_symbol_card` instead of reading 1,000+ line files for simple signature lookups.
+3. Check `lens_blast_radius` and `lens_audit_dynamic_risk` before refactoring any symbol.
+4. Use `lens_pack_context` to retrieve code slices for editing.
+5. Dry-run proposed changes with `lens_ghost_patch_diff` before disk writes.
+6. Run tests via `lens_shadow_test_sandbox` to keep the user's working tree clean.
+7. Record decisions and hypotheses in `lens_manage_memory`.
