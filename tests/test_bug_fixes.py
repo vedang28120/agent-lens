@@ -98,3 +98,40 @@ def test_bug5_ast_cache_sha256_cas(tmp_path):
     scan2 = cart2.scan()
     # Should be a cache hit because SHA-256 hash matches
     assert scan2["cache_hits"] == 1, "AST cache must hit when content SHA-256 is unchanged despite mtime shift"
+
+
+def test_issue6_ci_checkout_full_depth():
+    """Issue #6 (Major): CI workflow must specify fetch-depth: 0 for worktree operations."""
+    ci_path = os.path.join(os.path.dirname(__file__), "..", ".github", "workflows", "ci.yml")
+    with open(ci_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "fetch-depth: 0" in content, "ci.yml must specify fetch-depth: 0 under actions/checkout"
+
+
+def test_issue7_guard_explicit_method_indexed():
+    """Issue #7 (Minor): verify_patch_hallucinations must be an indexed method on HallucinationGuard."""
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    cart = CodebaseCartographer(repo_root)
+    cart.scan()
+    assert "verify_patch_hallucinations" in cart.symbol_index, (
+        "verify_patch_hallucinations must be indexed as a method in AST symbol_index"
+    )
+
+    guard = HallucinationGuard(cart)
+    res = guard.verify_file(os.path.join(repo_root, "agent_lens", "mcp", "server.py"))
+    assert res["is_clean"] is True, f"mcp/server.py should be clean of hallucinations: {res.get('hallucinations')}"
+
+
+def test_issue8_preflight_directory_support(tmp_path):
+    """Issue #8 (Minor): PreflightChecker.check_file must support directory paths without crashing."""
+    from agent_lens.core.preflight import PreflightChecker
+
+    sub = tmp_path / "subpkg"
+    sub.mkdir()
+    (sub / "mod1.py").write_text("def fn1(): pass\n", encoding="utf-8")
+    (sub / "mod2.json").write_text('{"key": "value"}', encoding="utf-8")
+
+    res = PreflightChecker.check_file(str(tmp_path))
+    assert res.get("is_directory") is True, "Preflight result should indicate is_directory"
+    assert res["valid"] is True, "Directory preflight check should pass for valid files"
+    assert res.get("checked_files", 0) >= 2, "Directory preflight should check contained code files"

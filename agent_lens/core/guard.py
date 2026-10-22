@@ -157,6 +157,10 @@ class HallucinationGuard:
             "hallucinations": hallucinations,
         }
 
+    def verify_patch_hallucinations(self, file_path: str, content: Optional[str] = None) -> Dict[str, Any]:
+        """Alias for verify_file providing backwards compatibility for MCP and Web APIs."""
+        return self.verify_file(file_path, content=content)
+
     def _extract_call_details(self, node: ast.Call) -> Optional[Tuple[str, Optional[str]]]:
         if isinstance(node.func, ast.Name):
             return node.func.id, None
@@ -178,6 +182,3 @@ class HallucinationGuard:
         if match and match[1] >= 65:
             return match[0]
         return None
-
-    # Alias for MCP server and API compatibility
-    verify_patch_hallucinations = verify_file

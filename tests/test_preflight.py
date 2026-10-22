@@ -26,14 +26,10 @@ def clean_fn():
 
 
 def test_git_conflict_detection():
-    conflict_code = """
-def calculate():
-<<<<<<< HEAD
-    return 100
-=======
-    return 200
->>>>>>> branch-b
-"""
+    c1 = "<<<" + "<<<< HEAD\n"
+    c2 = "===" + "====\n"
+    c3 = ">>>" + ">>>> branch-b\n"
+    conflict_code = f"def calculate():\n{c1}    return 100\n{c2}    return 200\n{c3}"
     res = PreflightChecker.check_file("conflict.py", content=conflict_code)
     assert res["valid"] is False
     assert any("Git conflict marker" in e for e in res["errors"])
