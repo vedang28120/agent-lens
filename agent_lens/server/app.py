@@ -4,9 +4,11 @@ import json
 import os
 import mimetypes
 import time
+import queue
 import threading
+from collections import deque
 from urllib.parse import urlparse, parse_qs
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from ..core.cartography import CodebaseCartographer
 from ..core.memory import AgentMemory
@@ -18,40 +20,52 @@ from ..core.guard import HallucinationGuard
 from ..core.planner import RefactorPlanner
 from ..core.watcher import CodebaseWatcher
 from ..core.report import ArchitectureReporter
+from ..core.security import resolve_safe_path
 
 
 class SSEBroadcaster:
-    """Manages Server-Sent Events subscribers for real-time dashboard updates."""
+    """Non-blocking Server-Sent Events broadcaster with per-client queues."""
     def __init__(self):
-        self.clients: List[http.server.BaseHTTPRequestHandler] = []
+        self.client_queues: Dict[Any, queue.Queue] = {}
         self.lock = threading.Lock()
 
-    def register(self, handler):
+    def register(self, client_id) -> queue.Queue:
+        q: queue.Queue = queue.Queue(maxsize=100)
         with self.lock:
-            self.clients.append(handler)
+            self.client_queues[client_id] = q
+        return q
 
-    def unregister(self, handler):
+    def unregister(self, client_id):
         with self.lock:
-            if handler in self.clients:
-                self.clients.remove(handler)
+            self.client_queues.pop(client_id, None)
 
     def broadcast(self, event_type: str, data: dict):
         payload = f"event: {event_type}\ndata: {json.dumps(data)}\n\n".encode("utf-8")
         with self.lock:
-            dead_clients = []
-            for client in self.clients:
+            for client_id, q in list(self.client_queues.items()):
                 try:
-                    client.wfile.write(payload)
-                    client.wfile.flush()
-                except Exception:
-                    dead_clients.append(client)
-            for dead in dead_clients:
-                if dead in self.clients:
-                    self.clients.remove(dead)
+                    q.put_nowait(payload)
+                except queue.Full:
+                    # Drop payload if consumer is stalled to avoid blocking broadcaster
+                    pass
+
+
+class ThreadSafeActivityBuffer:
+    def __init__(self, maxlen: int = 50):
+        self.buffer = deque(maxlen=maxlen)
+        self.lock = threading.Lock()
+
+    def append(self, activity: dict):
+        with self.lock:
+            self.buffer.append(activity)
+
+    def get_recent(self, count: int = 30) -> list:
+        with self.lock:
+            return list(self.buffer)[-count:]
 
 
 broadcaster = SSEBroadcaster()
-recent_activities: List[Dict[str, Any]] = []
+activity_buffer = ThreadSafeActivityBuffer(maxlen=50)
 
 
 class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
@@ -66,7 +80,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-AgentLens-Token")
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -78,7 +92,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed.path
         query = parse_qs(parsed.query)
 
-        # 1. API: Server-Sent Events
+        # 1. Server-Sent Events Stream (Non-blocking queue driven)
         if path == "/api/events":
             self.send_response(200)
             self._send_cors_headers()
@@ -87,64 +101,73 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Connection", "keep-alive")
             self.end_headers()
 
-            broadcaster.register(self)
+            client_q = broadcaster.register(self)
             try:
                 self.wfile.write(b": heartbeat\n\n")
                 self.wfile.flush()
                 while True:
-                    time.sleep(15)
-                    self.wfile.write(b": heartbeat\n\n")
-                    self.wfile.flush()
+                    try:
+                        msg = client_q.get(timeout=15.0)
+                        self.wfile.write(msg)
+                        self.wfile.flush()
+                    except queue.Empty:
+                        self.wfile.write(b": heartbeat\n\n")
+                        self.wfile.flush()
             except Exception:
+                pass
+            finally:
                 broadcaster.unregister(self)
             return
 
-        # 2. API: Status & Metrics
+        # 2. API: System Status & Metrics
         if path == "/api/status":
-            self._send_json({
+            symbols_count = sum(len(v) for v in self.cartographer.symbol_index.values())
+            res = {
                 "status": "online",
                 "root_path": self.cartographer.root_path,
                 "files_count": len(self.cartographer.file_results),
-                "symbols_count": sum(len(v) for v in self.cartographer.symbol_index.values()),
-                "memos_count": len(self.memory.get_all_memos()),
-                "tasks_count": len(self.memory.get_tasks()),
-                "hypotheses_count": len(self.memory.get_hypotheses()),
-            })
+                "symbols_count": symbols_count,
+                "version": "1.1.0",
+                "timestamp": time.time(),
+            }
+            self._send_json(res)
             return
 
-        # 3. API: Graph Export
+        # 3. API: Architecture Graph
         if path == "/api/graph":
-            data = self.cartographer.get_graph_export()
-            self._send_json(data)
+            graph_data = self.cartographer.get_graph_export()
+            self._send_json(graph_data)
             return
 
-        # 4. API: Working Memory State
-        if path == "/api/memory":
-            self._send_json({
-                "hypotheses": self.memory.get_hypotheses(),
-                "decisions": self.memory.get_decisions(),
-                "memos": self.memory.get_all_memos(),
-                "tasks": self.memory.get_tasks(),
-                "scratchpad": self.memory.get_scratchpad(),
-                "summary": self.memory.get_compact_summary(),
-            })
-            return
-
-        # 5. API: Architecture Radar
+        # 4. API: Architecture Radar Antipatterns
         if path == "/api/radar":
             radar = ArchitectureRadar(self.cartographer)
-            self._send_json(radar.analyze())
+            analysis = radar.analyze()
+            self._send_json(analysis)
             return
 
-        # 6. API: Port Sentinel
+        # 5. API: Listening Developer Ports
         if path == "/api/ports":
             ports = PortSentinel.list_listening_ports()
-            self._send_json(ports)
+            self._send_json({"ports": ports})
             return
 
-        # 7. API: Recent File Activities
+        # 6. API: Recent File System & Agent Activities
         if path == "/api/activity":
-            self._send_json(recent_activities[-30:])
+            self._send_json({"activities": activity_buffer.get_recent(30)})
+            return
+
+        # 7. API: Agent Working Memory
+        if path == "/api/memory":
+            res = {
+                "hypotheses": self.memory.get_hypotheses(),
+                "decisions": self.memory.get_decisions(),
+                "tasks": self.memory.get_tasks(),
+                "memos": self.memory.get_all_memos(),
+                "scratchpad": self.memory.get_scratchpad(),
+                "compact_summary": self.memory.get_compact_summary(),
+            }
+            self._send_json(res)
             return
 
         # 8. API: Symbol Card
@@ -178,12 +201,17 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"report": reporter.generate_report()})
             return
 
-        # 11. Static Web Assets
+        # 11. Static Web Assets (Strictly hardened against path traversal)
         rel_req = path.lstrip("/")
         if not rel_req:
             rel_req = "index.html"
 
-        file_on_disk = os.path.join(self.web_dir, rel_req)
+        try:
+            file_on_disk = resolve_safe_path(self.web_dir, rel_req)
+        except (ValueError, PermissionError) as e:
+            self._send_error(403, f"Forbidden: {str(e)}")
+            return
+
         if os.path.exists(file_on_disk) and os.path.isfile(file_on_disk):
             mime_type, _ = mimetypes.guess_type(file_on_disk)
             try:
@@ -193,6 +221,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_cors_headers()
                 self.send_header("Content-Type", mime_type or "text/plain")
                 self.send_header("Content-Length", str(len(content)))
+                self.send_header("X-Content-Type-Options", "nosniff")
                 self.end_headers()
                 self.wfile.write(content)
                 return
@@ -207,12 +236,13 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+
         try:
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
             payload = json.loads(body.decode("utf-8")) if body else {}
-        except Exception as e:
-            self._send_error(400, f"Invalid JSON payload: {str(e)}")
+        except json.JSONDecodeError:
+            self._send_error(400, "Invalid JSON payload")
             return
 
         if path == "/api/memory/hypo":
@@ -222,12 +252,13 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                     statement=payload.get("statement", ""),
                     status=payload.get("status", "exploring"),
                     evidence=payload.get("evidence", ""),
+                    agent_id=payload.get("agent_id", "default"),
                 )
                 broadcaster.broadcast("memory_update", {"type": "hypothesis_added", "id": hid})
                 self._send_json({"success": True, "id": hid})
             elif action == "update":
                 self.memory.update_hypothesis(
-                    hypothesis_id=payload.get("id"),
+                    hypo_id=payload.get("id"),
                     status=payload.get("status"),
                     evidence=payload.get("evidence"),
                 )
@@ -243,6 +274,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                     status=payload.get("status", "pending"),
                     priority=payload.get("priority", 1),
                     notes=payload.get("notes", ""),
+                    agent_id=payload.get("agent_id", "default"),
                 )
                 broadcaster.broadcast("memory_update", {"type": "task_added", "id": tid})
                 self._send_json({"success": True, "id": tid})
@@ -251,6 +283,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
                     task_id=payload.get("id"),
                     status=payload.get("status"),
                     notes=payload.get("notes"),
+                    priority=payload.get("priority"),
                 )
                 broadcaster.broadcast("memory_update", {"type": "task_updated", "id": payload.get("id")})
                 self._send_json({"success": True})
@@ -280,9 +313,21 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/ghost-patch":
             target_file = payload.get("file", "")
-            content = payload.get("content", "")
+            content = payload.get("content")
+            search_block = payload.get("search_block")
+            replace_block = payload.get("replace_block")
+            diff_patch = payload.get("diff_patch")
+
             sandbox = GhostPatchSandbox(self.cartographer)
-            verdict = sandbox.dry_run_patch(target_file, content)
+            if search_block is not None or diff_patch is not None:
+                verdict = sandbox.dry_run_patch_diff(
+                    target_file,
+                    search_block=search_block,
+                    replace_block=replace_block,
+                    diff_patch=diff_patch,
+                )
+            else:
+                verdict = sandbox.dry_run_patch(target_file, content or "")
             self._send_json(verdict)
             return
 
@@ -290,7 +335,7 @@ class MissionControlHandler(http.server.SimpleHTTPRequestHandler):
             target_file = payload.get("file", "")
             content = payload.get("content")
             guard = HallucinationGuard(self.cartographer)
-            res = guard.verify_file(target_file, content=content)
+            res = guard.verify_patch_hallucinations(target_file, content=content)
             self._send_json(res)
             return
 
@@ -356,9 +401,7 @@ def start_mission_control_server(port: int = 4141, root_dir: str = "."):
             "type": event_type,
             "timestamp": time.time(),
         }
-        recent_activities.append(activity)
-        if len(recent_activities) > 50:
-            recent_activities.pop(0)
+        activity_buffer.append(activity)
         broadcaster.broadcast("file_activity", activity)
 
     watcher = CodebaseWatcher(cart, on_change_callback=on_file_event)

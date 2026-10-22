@@ -12,6 +12,8 @@ from .core.sentinel import PortSentinel
 from .core.guard import HallucinationGuard
 from .core.planner import RefactorPlanner
 from .core.report import ArchitectureReporter
+from .core.shadow import GitShadowSandbox
+from .core.delegation import DelegationContractGenerator
 
 
 def main():
@@ -168,6 +170,37 @@ def main():
     serve_parser = subparsers.add_parser("serve", help="Launch AgentLens Mission Control web dashboard")
     serve_parser.add_argument("--port", type=int, default=4141, help="Port to run server on (default: 4141)")
     serve_parser.add_argument("--root", default=".", help="Root directory of project to monitor (default: .)")
+
+    # diff-patch
+    diff_patch_parser = subparsers.add_parser("diff-patch", help="Dry-run a localized search/replace or diff patch")
+    diff_patch_parser.add_argument("file", help="Target file")
+    diff_patch_parser.add_argument("--search", help="Original text block to search for")
+    diff_patch_parser.add_argument("--replace", help="Replacement text block")
+    diff_patch_parser.add_argument("--diff", help="Path to unified diff patch file")
+    diff_patch_parser.add_argument("--root", default=".", help="Root directory (default: .)")
+    diff_patch_parser.add_argument("--json", action="store_true", help="Output raw JSON")
+
+    # shadow-test
+    shadow_parser = subparsers.add_parser("shadow-test", help="Execute test suite in isolated ephemeral Git worktree")
+    shadow_parser.add_argument("file", help="Target file to patch")
+    shadow_parser.add_argument("--patch", required=True, help="Path to file containing replacement code")
+    shadow_parser.add_argument("--cmd", default="pytest", help="Test command to execute (default: pytest)")
+    shadow_parser.add_argument("--timeout", type=int, default=30, help="Timeout in seconds (default: 30)")
+    shadow_parser.add_argument("--root", default=".", help="Root directory (default: .)")
+    shadow_parser.add_argument("--json", action="store_true", help="Output raw JSON")
+
+    # delegate
+    delegate_parser = subparsers.add_parser("delegate", help="Generate subagent work briefing contract under 600 tokens")
+    delegate_parser.add_argument("objective", help="Subagent task objective")
+    delegate_parser.add_argument("--files", nargs="+", required=True, help="Scoped files allowed to modify")
+    delegate_parser.add_argument("--symbols", nargs="*", help="Optional scoped symbol names")
+    delegate_parser.add_argument("--cmd", help="Verification command")
+    delegate_parser.add_argument("--root", default=".", help="Root directory (default: .)")
+    delegate_parser.add_argument("--json", action="store_true", help="Output raw JSON")
+
+    # cache-clean
+    cache_parser = subparsers.add_parser("cache-clean", help="Clean persistent AST cache")
+    cache_parser.add_argument("--root", default=".", help="Root directory (default: .)")
 
     args = parser.parse_args()
 
@@ -463,6 +496,85 @@ def main():
     elif args.command == "serve":
         from .server.app import start_mission_control_server
         start_mission_control_server(port=args.port, root_dir=args.root)
+
+    elif args.command == "diff-patch":
+        cart = CodebaseCartographer(args.root)
+        cart.scan()
+        sandbox = GhostPatchSandbox(cart)
+        diff_text = None
+        if args.diff:
+            with open(args.diff, "r", encoding="utf-8") as f:
+                diff_text = f.read()
+        res = sandbox.dry_run_patch_diff(
+            args.file,
+            search_block=args.search,
+            replace_block=args.replace,
+            diff_patch=diff_text,
+        )
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            print(f"=== Ghost Patch Diff Verdict: {res['verdict']} (Score: {res['safety_score']}/100) ===")
+            print(f"Target File: {res['file']}")
+            if res.get("breakages"):
+                print("Breakages:")
+                for b in res["breakages"]:
+                    print(f"  ❌ {b}")
+            if res.get("warnings"):
+                print("Warnings:")
+                for w in res["warnings"]:
+                    print(f"  ⚠️  {w}")
+            if not res.get("breakages") and not res.get("warnings"):
+                print("✅ All callers and syntax checks clean.")
+
+    elif args.command == "shadow-test":
+        with open(args.patch, "r", encoding="utf-8") as f:
+            patch_content = f.read()
+        cart = CodebaseCartographer(args.root)
+        cart.scan()
+        shadow = GitShadowSandbox(cart)
+        res = shadow.run_shadow_test(
+            {args.file: patch_content},
+            test_command=args.cmd,
+            timeout=args.timeout,
+        )
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            status_badge = "PASSED" if res["success"] else "FAILED"
+            print(f"=== Shadow Test Execution: [{status_badge}] in {res['duration_seconds']}s ===")
+            print(f"Sandbox ID: {res['sandbox_id']}")
+            print(f"Command: {res['test_command']}")
+            if res["stdout"]:
+                print(f"Output:\n{res['stdout']}")
+            if res["stderr"]:
+                print(f"Errors:\n{res['stderr']}")
+
+    elif args.command == "delegate":
+        cart = CodebaseCartographer(args.root)
+        cart.scan()
+        delegator = DelegationContractGenerator(cart)
+        briefing = delegator.generate_briefing(
+            args.objective,
+            args.files,
+            target_symbols=args.symbols,
+            test_command=args.cmd,
+        )
+        if args.json:
+            print(json.dumps(briefing, indent=2))
+        else:
+            print(briefing["markdown"])
+
+    elif args.command == "cache-clean":
+        cache_file = os.path.join(args.root, ".agentlens", "ast_cache.db")
+        if os.path.exists(cache_file):
+            try:
+                os.remove(cache_file)
+                print(f"Cleaned AST cache: {cache_file}")
+            except Exception as e:
+                print(f"Failed to remove cache: {str(e)}", file=sys.stderr)
+        else:
+            print("No cache database found.")
 
 
 if __name__ == "__main__":

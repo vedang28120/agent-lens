@@ -6,6 +6,7 @@ import rapidfuzz.fuzz
 from typing import Dict, List, Optional, Any, Set, Tuple
 from .cartography import CodebaseCartographer
 from .parser import CodeParser
+from .security import resolve_safe_path
 
 
 class HallucinationGuard:
@@ -46,9 +47,14 @@ class HallucinationGuard:
         if not self.cart.file_results:
             self.cart.scan()
 
-        norm_file = file_path.replace("\\", "/")
+        try:
+            full_path = resolve_safe_path(self.cart.root_path, file_path)
+            base_real = os.path.realpath(os.path.abspath(self.cart.root_path))
+            norm_file = os.path.relpath(full_path, base_real).replace("\\", "/")
+        except (ValueError, PermissionError) as e:
+            return {"valid": False, "error": f"Security violation: {str(e)}", "hallucinations": []}
+
         if content is None:
-            full_path = os.path.join(self.cart.root_path, norm_file)
             if not os.path.exists(full_path):
                 return {"valid": False, "error": f"File not found: {file_path}", "hallucinations": []}
             try:

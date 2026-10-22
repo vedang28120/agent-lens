@@ -57,11 +57,19 @@ class ContextPacker:
         # Token approximation (~3.8 chars per token for code)
         est_tokens = int(len(final_slice) / 3.8)
 
-        # Truncate gracefully if exceeding budget
+        # Truncate gracefully on line boundaries if exceeding budget
         if est_tokens > token_budget:
             max_chars = int(token_budget * 3.8)
-            final_slice = final_slice[:max_chars] + "\n\n# ... [TRUNCATED TO FIT TOKEN BUDGET]"
-            est_tokens = token_budget
+            slice_lines = final_slice.splitlines()
+            curr_chars = 0
+            truncated_lines = []
+            for line in slice_lines:
+                if curr_chars + len(line) + 1 > max_chars:
+                    break
+                truncated_lines.append(line)
+                curr_chars += len(line) + 1
+            final_slice = "\n".join(truncated_lines) + "\n\n# ... [TRUNCATED ON LINE BOUNDARY TO FIT TOKEN BUDGET]"
+            est_tokens = int(len(final_slice) / 3.8)
 
         return {
             "query": query,
@@ -121,14 +129,29 @@ class ContextPacker:
         except Exception:
             return raw_code
 
+        # Collect target node line range so we never prune closures/helpers inside the target!
+        target_range = None
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                if node.name == target_symbol_name:
+                    target_range = (node.lineno, node.end_lineno or node.lineno)
+                    break
+
         pruned_lines = []
         skip_until_line = -1
 
-        # Collect symbols to prune (all functions/methods except target)
+        # Collect symbols to prune (all functions/methods outside target)
         prune_ranges = []
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if node.name != target_symbol_name:
+                    node_start = node.lineno
+                    node_end = node.end_lineno or node.lineno
+
+                    # If this function is nested INSIDE target function/class, preserve it intact!
+                    if target_range and target_range[0] <= node_start <= target_range[1]:
+                        continue
+
                     # Keep signature and docstring, prune body
                     body_start = node.lineno
                     if node.body:

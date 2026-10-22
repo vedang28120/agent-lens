@@ -1,4 +1,5 @@
 import os
+import itertools
 import networkx as nx
 from typing import Dict, List, Any, Set, Tuple
 from .cartography import CodebaseCartographer
@@ -47,17 +48,24 @@ class ArchitectureRadar:
                     G.add_edge(src_file, target)
         return G
 
-    def _find_circular_dependencies(self, G: nx.DiGraph) -> List[List[str]]:
+    def _find_circular_dependencies(self, G: nx.DiGraph, max_cycles: int = 10) -> List[List[str]]:
+        clean_cycles = []
         try:
-            raw_cycles = list(nx.simple_cycles(G))
-            # Format nicely
-            clean_cycles = []
-            for cycle in raw_cycles:
-                if len(cycle) > 1:
-                    clean_cycles.append(cycle + [cycle[0]])
-            return clean_cycles[:10]  # Cap at top 10
+            # Step 1: Decompose graph into non-trivial Strongly Connected Components (O(V+E))
+            sccs = [scc for scc in nx.strongly_connected_components(G) if len(scc) > 1]
+
+            # Step 2: Search cycles lazily inside non-trivial components using islice to prevent OOM
+            for scc in sccs:
+                subgraph = G.subgraph(scc)
+                cycle_iter = nx.simple_cycles(subgraph)
+                for cycle in itertools.islice(cycle_iter, max_cycles - len(clean_cycles)):
+                    if len(cycle) > 1:
+                        clean_cycles.append(cycle + [cycle[0]])
+                    if len(clean_cycles) >= max_cycles:
+                        return clean_cycles
         except Exception:
-            return []
+            pass
+        return clean_cycles
 
     def _find_god_nodes(self, G: nx.DiGraph) -> List[Dict[str, Any]]:
         if len(G.nodes) == 0:

@@ -89,6 +89,8 @@ class PythonASTVisitor(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         mod = node.module or ""
+        if node.level and node.level > 0:
+            mod = ("." * node.level) + mod
         names = [alias.name for alias in node.names]
         self.imports.append(
             ImportInfo(
@@ -234,7 +236,9 @@ class CodeParser:
             return "python"
         elif ext in [".js", ".jsx", ".mjs", ".cjs"]:
             return "javascript"
-        elif ext in [".ts", ".tsx", ".mts", ".cts"]:
+        elif ext == ".tsx":
+            return "tsx"
+        elif ext in [".ts", ".mts", ".cts"]:
             return "typescript"
         elif ext == ".go":
             return "go"
@@ -260,11 +264,10 @@ class CodeParser:
 
         lang = cls.detect_language(file_path)
         lines = content.splitlines()
-        line_count = len(lines)
 
         if lang == "python":
             return cls._parse_python(file_path, content, lines)
-        elif lang in ["javascript", "typescript"]:
+        elif lang in ["javascript", "typescript", "tsx"]:
             return cls._parse_js_ts(file_path, content, lines, lang)
         else:
             return cls._parse_generic(file_path, content, lines, lang)
@@ -306,7 +309,10 @@ class CodeParser:
 
         if TREE_SITTER_AVAILABLE:
             try:
-                if lang == "typescript":
+                if lang == "tsx":
+                    ts_lang = Language(tree_sitter_typescript.language_tsx())
+                    parser = Parser(ts_lang)
+                elif lang == "typescript":
                     ts_lang = Language(tree_sitter_typescript.language_typescript())
                     parser = Parser(ts_lang)
                 else:
@@ -316,7 +322,7 @@ class CodeParser:
                 tree = parser.parse(content.encode("utf-8"))
                 root = tree.root_node
 
-                def traverse(node, current_parent=None):
+                def traverse(node, current_parent=None, current_symbol=None):
                     nonlocal symbols, imports, all_calls
 
                     node_type = node.type
@@ -328,7 +334,20 @@ class CodeParser:
                         text = content[node.start_byte:node.end_byte]
                         mod_match = re.search(r"from\s+['\"]([^'\"]+)['\"]", text)
                         mod = mod_match.group(1) if mod_match else text
-                        imports.append(ImportInfo(module=mod, names=[], is_from=True, line=start_line))
+
+                        # Extract imported names
+                        imp_names = []
+                        for child in node.children:
+                            if child.type == "import_clause":
+                                for clause_child in child.children:
+                                    if clause_child.type == "identifier":
+                                        imp_names.append(content[clause_child.start_byte:clause_child.end_byte])
+                                    elif clause_child.type == "named_imports":
+                                        for spec in clause_child.children:
+                                            if spec.type == "import_specifier":
+                                                name_node = spec.child_by_field_name("name") or spec.children[0]
+                                                imp_names.append(content[name_node.start_byte:name_node.end_byte])
+                        imports.append(ImportInfo(module=mod, names=imp_names, is_from=True, line=start_line))
 
                     # Function declarations
                     elif node_type in ["function_declaration", "generator_function_declaration"]:
@@ -336,13 +355,71 @@ class CodeParser:
                         name = content[name_node.start_byte:name_node.end_byte] if name_node else "anonymous"
                         params_node = node.child_by_field_name("parameters")
                         params = content[params_node.start_byte:params_node.end_byte] if params_node else "()"
+                        sym = Symbol(
+                            name=name,
+                            kind="function",
+                            line_start=start_line,
+                            line_end=end_line,
+                            signature=f"function {name}{params}",
+                            parent=current_parent,
+                        )
+                        symbols.append(sym)
+                        for child in node.children:
+                            traverse(child, current_parent=current_parent, current_symbol=sym)
+                        return
+
+                    # Variable-bound arrow functions or function expressions
+                    elif node_type in ["lexical_declaration", "variable_declaration"]:
+                        for declarator in node.children:
+                            if declarator.type == "variable_declarator":
+                                name_node = declarator.child_by_field_name("name")
+                                value_node = declarator.child_by_field_name("value")
+                                if name_node and value_node and value_node.type in ["arrow_function", "function_expression"]:
+                                    name = content[name_node.start_byte:name_node.end_byte]
+                                    params_node = value_node.child_by_field_name("parameters")
+                                    params = content[params_node.start_byte:params_node.end_byte] if params_node else "()"
+                                    sym = Symbol(
+                                        name=name,
+                                        kind="function",
+                                        line_start=start_line,
+                                        line_end=end_line,
+                                        signature=f"const {name} = {params} => ...",
+                                        parent=current_parent,
+                                    )
+                                    symbols.append(sym)
+                                    for child in value_node.children:
+                                        traverse(child, current_parent=current_parent, current_symbol=sym)
+                                    continue
+                        for child in node.children:
+                            traverse(child, current_parent=current_parent, current_symbol=current_symbol)
+                        return
+
+                    # Interfaces (TypeScript / TSX)
+                    elif node_type == "interface_declaration":
+                        name_node = node.child_by_field_name("name")
+                        name = content[name_node.start_byte:name_node.end_byte] if name_node else "AnonymousInterface"
                         symbols.append(
                             Symbol(
                                 name=name,
-                                kind="function",
+                                kind="interface",
                                 line_start=start_line,
                                 line_end=end_line,
-                                signature=f"function {name}{params}",
+                                signature=f"interface {name}",
+                                parent=current_parent,
+                            )
+                        )
+
+                    # Type Aliases (TypeScript / TSX)
+                    elif node_type == "type_alias_declaration":
+                        name_node = node.child_by_field_name("name")
+                        name = content[name_node.start_byte:name_node.end_byte] if name_node else "AnonymousType"
+                        symbols.append(
+                            Symbol(
+                                name=name,
+                                kind="interface",
+                                line_start=start_line,
+                                line_end=end_line,
+                                signature=f"type {name} = ...",
                                 parent=current_parent,
                             )
                         )
@@ -362,7 +439,7 @@ class CodeParser:
                             )
                         )
                         for child in node.children:
-                            traverse(child, current_parent=name)
+                            traverse(child, current_parent=name, current_symbol=None)
                         return
 
                     # Method definitions
@@ -371,16 +448,18 @@ class CodeParser:
                         name = content[name_node.start_byte:name_node.end_byte] if name_node else "anonymous"
                         params_node = node.child_by_field_name("parameters")
                         params = content[params_node.start_byte:params_node.end_byte] if params_node else "()"
-                        symbols.append(
-                            Symbol(
-                                name=name,
-                                kind="method",
-                                line_start=start_line,
-                                line_end=end_line,
-                                signature=f"{name}{params}",
-                                parent=current_parent,
-                            )
+                        sym = Symbol(
+                            name=name,
+                            kind="method",
+                            line_start=start_line,
+                            line_end=end_line,
+                            signature=f"{name}{params}",
+                            parent=current_parent,
                         )
+                        symbols.append(sym)
+                        for child in node.children:
+                            traverse(child, current_parent=current_parent, current_symbol=sym)
+                        return
 
                     # Call expressions
                     elif node_type == "call_expression":
@@ -388,9 +467,11 @@ class CodeParser:
                         if fn_node:
                             call_name = content[fn_node.start_byte:fn_node.end_byte]
                             all_calls.add(call_name)
+                            if current_symbol:
+                                current_symbol.calls.append(call_name)
 
                     for child in node.children:
-                        traverse(child, current_parent)
+                        traverse(child, current_parent=current_parent, current_symbol=current_symbol)
 
                 traverse(root)
 
@@ -407,9 +488,14 @@ class CodeParser:
 
         # Regex fallback for JS/TS
         for idx, line in enumerate(lines, 1):
-            imp_match = re.search(r"import\s+.*?from\s+['\"]([^'\"]+)['\"]", line)
+            imp_match = re.search(r"import\s+(?:\{([^}]+)\}|\s*([a-zA-Z0-9_$]+))?\s*from\s+['\"]([^'\"]+)['\"]", line)
             if imp_match:
-                imports.append(ImportInfo(module=imp_match.group(1), names=[], is_from=True, line=idx))
+                names = []
+                if imp_match.group(1):
+                    names = [n.strip() for n in imp_match.group(1).split(",") if n.strip()]
+                elif imp_match.group(2):
+                    names = [imp_match.group(2).strip()]
+                imports.append(ImportInfo(module=imp_match.group(3), names=names, is_from=True, line=idx))
 
             fn_match = re.search(r"(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\((.*?)\)", line)
             if fn_match:
@@ -420,6 +506,18 @@ class CodeParser:
                         line_start=idx,
                         line_end=idx,
                         signature=fn_match.group(0).strip(),
+                    )
+                )
+
+            arrow_match = re.search(r"(?:export\s+)?(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?\((.*?)\)\s*=>", line)
+            if arrow_match:
+                symbols.append(
+                    Symbol(
+                        name=arrow_match.group(1),
+                        kind="function",
+                        line_start=idx,
+                        line_end=idx,
+                        signature=f"const {arrow_match.group(1)} = (...) => ...",
                     )
                 )
 

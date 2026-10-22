@@ -2,11 +2,15 @@ import os
 import sqlite3
 import json
 import time
-from typing import List, Dict, Optional, Any
+from contextlib import contextmanager
+from typing import List, Dict, Optional, Any, Generator
 
 
 class AgentMemory:
-    """Persistent SQLite-backed working memory and flight recorder for AI agents."""
+    """
+    Persistent, thread-safe, SQLite WAL-backed working memory and flight recorder
+    for AI agents and multi-agent swarms.
+    """
 
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
@@ -16,12 +20,48 @@ class AgentMemory:
             db_path = os.path.join(lens_dir, "memory.db")
 
         self.db_path = db_path
+        self._init_wal()
         self._init_db()
 
-    def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _init_wal(self):
+        """Configures Write-Ahead Logging (WAL) and busy timeouts for high-throughput concurrency."""
+        with self._get_connection() as conn:
+            conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA synchronous = NORMAL;")
+            conn.execute("PRAGMA busy_timeout = 5000;")
+            conn.commit()
+
+    @contextmanager
+    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+        """
+        Thread-safe connection generator that guarantees connection closure
+        and auto-retries on transient database locks.
+        """
+        retries = 4
+        backoff = 0.05
+        conn = None
+
+        while retries > 0:
+            try:
+                conn = sqlite3.connect(self.db_path, timeout=5.0)
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA busy_timeout = 5000;")
+                break
+            except sqlite3.OperationalError:
+                retries -= 1
+                if retries == 0:
+                    raise
+                time.sleep(backoff)
+                backoff *= 2
+
+        try:
+            yield conn
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     def _init_db(self):
         with self._get_connection() as conn:
@@ -34,6 +74,7 @@ class AgentMemory:
                     statement TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'exploring',  -- exploring, confirmed, refuted
                     evidence TEXT DEFAULT '',
+                    agent_id TEXT DEFAULT 'default',
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL
                 )
@@ -46,33 +87,37 @@ class AgentMemory:
                     title TEXT NOT NULL,
                     rationale TEXT NOT NULL,
                     tradeoffs TEXT DEFAULT '',
+                    agent_id TEXT DEFAULT 'default',
                     created_at REAL NOT NULL
                 )
             """)
 
-            # Memos / Key-Value Facts table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS memos (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL,
-                    category TEXT DEFAULT 'general',
-                    updated_at REAL NOT NULL
-                )
-            """)
-
-            # Tasks table
+            # Structured Tasks table with multi-agent hierarchy support
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS tasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     title TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'pending',  -- pending, in_progress, done, blocked
-                    priority INTEGER DEFAULT 1,
+                    priority INTEGER DEFAULT 1,             -- 1: Normal, 2: High, 3: Critical
+                    parent_task_id INTEGER DEFAULT NULL,
+                    agent_id TEXT DEFAULT 'default',
                     notes TEXT DEFAULT '',
+                    created_at REAL NOT NULL,
                     updated_at REAL NOT NULL
                 )
             """)
 
-            # Collaborative Shared Scratchpad table
+            # Key-Value Memos table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS memos (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    agent_id TEXT DEFAULT 'default',
+                    updated_at REAL NOT NULL
+                )
+            """)
+
+            # Scratchpad table (Single active working markdown block)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS scratchpad (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -82,84 +127,185 @@ class AgentMemory:
                 )
             """)
 
-            # Default scratchpad row
+            # Ensure single scratchpad row
             cursor.execute("""
                 INSERT OR IGNORE INTO scratchpad (id, content, updated_by, updated_at)
-                VALUES (1, '# AgentLens Shared Scratchpad\n\nUse this board for persistent notes between human and agent.', 'system', ?)
+                VALUES (1, '# Agent Scratchpad\n- Goal: Understand codebase\n- Status: Initialized', 'system', ?)
             """, (time.time(),))
+
+            # Resilient column migrations for existing databases
+            for col_sql in [
+                "ALTER TABLE hypotheses ADD COLUMN agent_id TEXT DEFAULT 'default'",
+                "ALTER TABLE decisions ADD COLUMN agent_id TEXT DEFAULT 'default'",
+                "ALTER TABLE tasks ADD COLUMN parent_task_id INTEGER DEFAULT NULL",
+                "ALTER TABLE tasks ADD COLUMN agent_id TEXT DEFAULT 'default'",
+                "ALTER TABLE memos ADD COLUMN agent_id TEXT DEFAULT 'default'",
+            ]:
+                try:
+                    cursor.execute(col_sql)
+                except sqlite3.OperationalError:
+                    pass
 
             conn.commit()
 
     # --- Hypotheses API ---
 
-    def add_hypothesis(self, statement: str, status: str = "exploring", evidence: str = "") -> int:
+    def add_hypothesis(self, statement: str, status: str = "exploring", evidence: str = "", agent_id: str = "default") -> int:
         now = time.time()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO hypotheses (statement, status, evidence, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                (statement, status, evidence, now, now),
+                "INSERT INTO hypotheses (statement, status, evidence, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (statement, status, evidence, agent_id, now, now),
             )
             conn.commit()
             return cursor.lastrowid
 
-    def update_hypothesis(self, hypothesis_id: int, status: Optional[str] = None, evidence: Optional[str] = None):
+    def update_hypothesis(self, hypo_id: int, status: Optional[str] = None, evidence: Optional[str] = None):
         now = time.time()
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            updates = []
-            params = []
+            updates = ["updated_at = ?"]
+            params: List[Any] = [now]
             if status:
                 updates.append("status = ?")
                 params.append(status)
             if evidence is not None:
                 updates.append("evidence = ?")
                 params.append(evidence)
-            if updates:
-                updates.append("updated_at = ?")
-                params.append(now)
-                params.append(hypothesis_id)
-                query = f"UPDATE hypotheses SET {', '.join(updates)} WHERE id = ?"
-                cursor.execute(query, tuple(params))
-                conn.commit()
+            params.append(hypo_id)
 
-    def get_hypotheses(self) -> List[Dict[str, Any]]:
+            sql = f"UPDATE hypotheses SET {', '.join(updates)} WHERE id = ?"
+            cursor.execute(sql, params)
+            conn.commit()
+
+    def get_hypotheses(self, status: Optional[str] = None, agent_id: Optional[str] = None) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM hypotheses ORDER BY id DESC")
-            return [dict(row) for row in cursor.fetchall()]
+            conditions = []
+            params = []
+            if status:
+                conditions.append("status = ?")
+                params.append(status)
+            if agent_id:
+                conditions.append("agent_id = ?")
+                params.append(agent_id)
 
-    # --- Decisions API ---
+            where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            cursor.execute(f"SELECT * FROM hypotheses {where} ORDER BY created_at ASC", params)
+            return [dict(r) for r in cursor.fetchall()]
 
-    def add_decision(self, title: str, rationale: str, tradeoffs: str = "") -> int:
+    # --- Architectural Decisions API ---
+
+    def add_decision(self, title: str, rationale: str, tradeoffs: str = "", agent_id: str = "default") -> int:
         now = time.time()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO decisions (title, rationale, tradeoffs, created_at) VALUES (?, ?, ?, ?)",
-                (title, rationale, tradeoffs, now),
+                "INSERT INTO decisions (title, rationale, tradeoffs, agent_id, created_at) VALUES (?, ?, ?, ?, ?)",
+                (title, rationale, tradeoffs, agent_id, now),
             )
             conn.commit()
             return cursor.lastrowid
 
-    def get_decisions(self) -> List[Dict[str, Any]]:
+    def get_decisions(self, agent_id: Optional[str] = None) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM decisions ORDER BY id DESC")
-            return [dict(row) for row in cursor.fetchall()]
+            if agent_id:
+                cursor.execute("SELECT * FROM decisions WHERE agent_id = ? ORDER BY created_at ASC", (agent_id,))
+            else:
+                cursor.execute("SELECT * FROM decisions ORDER BY created_at ASC")
+            return [dict(r) for r in cursor.fetchall()]
+
+    # --- Structured Tasks API ---
+
+    def add_task(
+        self,
+        title: str,
+        status: str = "pending",
+        priority: int = 1,
+        notes: str = "",
+        agent_id: str = "default",
+        parent_id: Optional[int] = None
+    ) -> int:
+        now = time.time()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO tasks (title, status, priority, parent_task_id, agent_id, notes, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (title, status, priority, parent_id, agent_id, notes, now, now),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def update_task(
+        self,
+        task_id: int,
+        status: Optional[str] = None,
+        notes: Optional[str] = None,
+        priority: Optional[int] = None
+    ):
+        now = time.time()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            updates = ["updated_at = ?"]
+            params: List[Any] = [now]
+            if status:
+                updates.append("status = ?")
+                params.append(status)
+            if notes is not None:
+                updates.append("notes = ?")
+                params.append(notes)
+            if priority is not None:
+                updates.append("priority = ?")
+                params.append(priority)
+            params.append(task_id)
+
+            sql = f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?"
+            cursor.execute(sql, params)
+            conn.commit()
+
+    def get_tasks(
+        self,
+        status: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        parent_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            conditions = []
+            params = []
+            if status:
+                conditions.append("status = ?")
+                params.append(status)
+            if agent_id:
+                conditions.append("agent_id = ?")
+                params.append(agent_id)
+            if parent_id is not None:
+                conditions.append("parent_task_id = ?")
+                params.append(parent_id)
+
+            where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            cursor.execute(f"SELECT * FROM tasks {where} ORDER BY priority DESC, id ASC", params)
+            return [dict(r) for r in cursor.fetchall()]
 
     # --- Memos API ---
 
-    def set_memo(self, key: str, value: Any, category: str = "general"):
+    def set_memo(self, key: str, value: str, agent_id: str = "default"):
         now = time.time()
-        val_str = json.dumps(value) if not isinstance(value, str) else value
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO memos (key, value, category, updated_at)
+            cursor.execute(
+                """
+                INSERT INTO memos (key, value, agent_id, updated_at)
                 VALUES (?, ?, ?, ?)
-                ON CONFLICT(key) DO UPDATE SET value = excluded.value, category = excluded.category, updated_at = excluded.updated_at
-            """, (key, val_str, category, now))
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, agent_id = excluded.agent_id, updated_at = excluded.updated_at
+                """,
+                (key, value, agent_id, now),
+            )
             conn.commit()
 
     def get_memo(self, key: str) -> Optional[str]:
@@ -169,50 +315,14 @@ class AgentMemory:
             row = cursor.fetchone()
             return row["value"] if row else None
 
-    def get_all_memos(self) -> Dict[str, str]:
+    def get_all_memos(self, agent_id: Optional[str] = None) -> Dict[str, str]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT key, value FROM memos ORDER BY key ASC")
-            return {row["key"]: row["value"] for row in cursor.fetchall()}
-
-    # --- Tasks API ---
-
-    def add_task(self, title: str, status: str = "pending", priority: int = 1, notes: str = "") -> int:
-        now = time.time()
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO tasks (title, status, priority, notes, updated_at) VALUES (?, ?, ?, ?, ?)",
-                (title, status, priority, notes, now),
-            )
-            conn.commit()
-            return cursor.lastrowid
-
-    def update_task(self, task_id: int, status: Optional[str] = None, notes: Optional[str] = None):
-        now = time.time()
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            updates = []
-            params = []
-            if status:
-                updates.append("status = ?")
-                params.append(status)
-            if notes is not None:
-                updates.append("notes = ?")
-                params.append(notes)
-            if updates:
-                updates.append("updated_at = ?")
-                params.append(now)
-                params.append(task_id)
-                query = f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?"
-                cursor.execute(query, tuple(params))
-                conn.commit()
-
-    def get_tasks(self) -> List[Dict[str, Any]]:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM tasks ORDER BY priority DESC, id ASC")
-            return [dict(row) for row in cursor.fetchall()]
+            if agent_id:
+                cursor.execute("SELECT key, value FROM memos WHERE agent_id = ? ORDER BY key ASC", (agent_id,))
+            else:
+                cursor.execute("SELECT key, value FROM memos ORDER BY key ASC")
+            return {r["key"]: r["value"] for r in cursor.fetchall()}
 
     # --- Scratchpad API ---
 
@@ -221,7 +331,9 @@ class AgentMemory:
             cursor = conn.cursor()
             cursor.execute("SELECT content, updated_by, updated_at FROM scratchpad WHERE id = 1")
             row = cursor.fetchone()
-            return dict(row) if row else {"content": "", "updated_by": "unknown", "updated_at": 0}
+            if row:
+                return dict(row)
+            return {"content": "", "updated_by": "system", "updated_at": time.time()}
 
     def update_scratchpad(self, content: str, updated_by: str = "agent"):
         now = time.time()
@@ -235,12 +347,12 @@ class AgentMemory:
 
     # --- Token-Optimized Agent Briefing ---
 
-    def get_compact_summary(self) -> str:
+    def get_compact_summary(self, agent_id: Optional[str] = None) -> str:
         """Generates an ultra-dense, token-minimalist summary of current session memory."""
-        tasks = self.get_tasks()
-        hypotheses = self.get_hypotheses()
-        decisions = self.get_decisions()
-        memos = self.get_all_memos()
+        tasks = self.get_tasks(agent_id=agent_id)
+        hypotheses = self.get_hypotheses(agent_id=agent_id)
+        decisions = self.get_decisions(agent_id=agent_id)
+        memos = self.get_all_memos(agent_id=agent_id)
 
         lines = ["### [AGENT WORKING MEMORY RECOVERY]"]
 
@@ -248,8 +360,9 @@ class AgentMemory:
         active_tasks = [t for t in tasks if t["status"] in ["in_progress", "pending"]]
         done_tasks = [t for t in tasks if t["status"] == "done"]
         lines.append(f"**Tasks**: {len(done_tasks)} completed, {len(active_tasks)} pending")
-        for t in active_tasks[:4]:
-            lines.append(f"  - [{t['status'].upper()}] #{t['id']}: {t['title']}")
+        for t in active_tasks[:5]:
+            prio_badge = " [CRITICAL]" if t["priority"] == 3 else (" [HIGH]" if t["priority"] == 2 else "")
+            lines.append(f"  - [{t['status'].upper()}]{prio_badge} #{t['id']}: {t['title']}")
 
         # Hypotheses
         if hypotheses:
@@ -261,7 +374,7 @@ class AgentMemory:
         # Decisions
         if decisions:
             lines.append(f"**Key Decisions ({len(decisions)})**:")
-            for d in decisions[:2]:
+            for d in decisions[:3]:
                 lines.append(f"  - `{d['title']}`: {d['rationale']}")
 
         # Memos
