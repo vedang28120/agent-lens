@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AgentLens // AI Mission Control & Exoskeleton</title>
+  <meta name="color-scheme" content="dark">
+  <title>AgentLens // Code Cartography & Safe Testing Mission Control</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,40 +12,51 @@
 </head>
 <body>
   <div class="app-container">
-    <!-- Top Bar -->
+    <!-- Top Bar Navigation -->
     <header class="top-nav">
       <div class="brand">
-        <div class="brand-logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="brand-logo" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <polygon points="12 8 8 12 12 16 16 12 12 8"/>
             <circle cx="12" cy="12" r="2"/>
           </svg>
         </div>
         <div class="brand-text">
-          <h1>AGENT<span>LENS</span></h1>
+          <div class="brand-title">
+            <h1>AGENT<span>LENS</span></h1>
+            <span class="version-tag">v1.2.0</span>
+          </div>
           <span class="tagline">CODE CARTOGRAPHY & SAFE TESTING MISSION CONTROL</span>
         </div>
       </div>
 
+      <!-- Center: Global Command Palette Quick Trigger -->
+      <div class="cmd-palette-trigger" id="cmdPaletteTrigger" role="button" tabindex="0" title="Open Command Palette (Ctrl+K)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span class="cmd-text">Search symbols, files, actions...</span>
+        <kbd class="cmd-key">Ctrl K</kbd>
+      </div>
+
+      <!-- Right Action Cluster -->
       <div class="status-cluster">
-        <div class="connection-badge" id="connBadge">
+        <div class="connection-badge" id="connBadge" title="Live Server-Sent Events stream connected">
           <span class="pulse-dot"></span>
           <span id="connStatus">SYNCED (LIVE SSE)</span>
         </div>
-        <button class="btn btn-secondary" id="rescanBtn">
+        <button class="btn btn-secondary btn-sm" id="rescanBtn" title="Rescan AST cache">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
           Re-scan AST
         </button>
-        <button class="btn btn-primary" id="copyBriefBtn">
+        <button class="btn btn-primary btn-sm" id="copyBriefBtn" title="Copy Agent Recovery Briefing for context restoration">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          Copy Recovery Briefing
+          Copy Briefing
         </button>
       </div>
     </header>
 
-    <!-- Metrics Ribbon -->
-    <div class="metrics-ribbon">
+    <!-- Top Metrics Ribbon -->
+    <section class="metrics-ribbon" aria-label="Project Vital Metrics">
       <div class="metric-card">
         <span class="metric-label">INDEXED FILES</span>
         <span class="metric-value" id="valFiles">--</span>
@@ -61,7 +73,7 @@
         <span class="metric-sub" id="subHealth">Clean architecture</span>
       </div>
       <div class="metric-card">
-        <span class="metric-label">REASONING HYPOTHESES</span>
+        <span class="metric-label">ACTIVE HYPOTHESES</span>
         <span class="metric-value amber" id="valHypo">--</span>
         <span class="metric-sub" id="subHypo">Reasoning ledger</span>
       </div>
@@ -71,239 +83,523 @@
         <span class="metric-sub" id="subPorts">Sentinel watching</span>
       </div>
       <div class="metric-card">
-        <span class="metric-label">TOKEN REDUCTION</span>
+        <span class="metric-label">TOKEN ECONOMY</span>
         <span class="metric-value green">~90.1%</span>
-        <span class="metric-sub">Packed AST edit slices</span>
+        <span class="metric-sub">Packed AST savings</span>
       </div>
-    </div>
+    </section>
 
-    <!-- Main Workspace Split -->
-    <main class="workspace-grid">
-      <!-- Left Panel: Cartography & Blast Visualizer -->
-      <section class="panel cartography-panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            <h2>CODEBASE CARTOGRAPHY & BLAST GRAPH</h2>
-          </div>
-          <div class="graph-controls">
-            <input type="text" id="graphSearchInput" placeholder="Quick find node..." class="search-input-xs">
-            <span class="graph-legend"><span class="legend-dot green"></span> Safe</span>
-            <span class="graph-legend"><span class="legend-dot amber"></span> Medium</span>
-            <span class="graph-legend"><span class="legend-dot red"></span> High Blast</span>
-            <button class="btn-xs" id="resetZoomBtn">Reset View</button>
-          </div>
+    <!-- Main Workspace Stage -->
+    <div class="workspace-layout">
+      <!-- Left Navigation Sidebar -->
+      <aside class="sidebar-nav" aria-label="Mission Navigation">
+        <div class="nav-section">
+          <span class="nav-section-title">CODE CARTOGRAPHY</span>
+          <button class="nav-item active" data-view="view-graph">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            <span>Code Graph</span>
+          </button>
+          <button class="nav-item" data-view="view-repomap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            <span>RepoMap Explorer</span>
+          </button>
+          <button class="nav-item" data-view="view-packer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+            <span>Context Slicer</span>
+          </button>
         </div>
 
-        <div class="canvas-wrapper">
-          <canvas id="graphCanvas"></canvas>
-          <div class="graph-overlay-hint">Drag nodes to explore • Scroll to zoom • Click node to inspect blast radius</div>
+        <div class="nav-section">
+          <span class="nav-section-title">SAFETY & VERIFICATION</span>
+          <button class="nav-item" data-view="view-blast">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
+            <span>Blast Radius</span>
+          </button>
+          <button class="nav-item" data-view="view-dynamic-risk">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>Dynamic Risk Audit</span>
+          </button>
+          <button class="nav-item" data-view="view-guard">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>Hallucination Guard</span>
+          </button>
+          <button class="nav-item" data-view="view-ghost">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+            <span>Ghost Patch Dry-Run</span>
+          </button>
+          <button class="nav-item" data-view="view-planner">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            <span>Refactor Planner</span>
+          </button>
         </div>
 
-        <!-- Symbol Inspector & Blast Details -->
-        <div class="symbol-inspector" id="symbolInspector">
-          <div class="inspector-header">
-            <span class="inspector-badge" id="inspectKind">FUNCTION</span>
-            <h3 id="inspectTitle">Select a node or search symbol to inspect</h3>
-            <span class="risk-pill" id="inspectRisk">RISK: --</span>
-          </div>
-          <div class="inspector-body">
-            <div class="code-signature" id="inspectSig">// Signature will appear here</div>
-            <div class="inspector-details" id="inspectMeta">
-              <div><strong>File:</strong> <span id="inspectFile">--</span></div>
-              <div><strong>Lines:</strong> <span id="inspectLines">--</span></div>
-              <div><strong>Docstring:</strong> <span id="inspectDoc">--</span></div>
-              <div><strong>Blast Radius:</strong> <span id="inspectBlastCount">--</span></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Right Panel: Agent Exoskeleton & Multi-Matrix -->
-      <section class="panel memory-panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-            <h2>AGENT EXOSKELETON & REASONING STATE</h2>
-          </div>
+        <div class="nav-section">
+          <span class="nav-section-title">AGENT MEMORY & LEDGER</span>
+          <button class="nav-item" data-view="view-hypo">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
+            <span>Hypotheses</span>
+            <span class="nav-badge" id="countHypo">0</span>
+          </button>
+          <button class="nav-item" data-view="view-tasks">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <span>Tasks</span>
+            <span class="nav-badge" id="countTasks">0</span>
+          </button>
+          <button class="nav-item" data-view="view-decisions">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Decisions</span>
+          </button>
+          <button class="nav-item" data-view="view-scratchpad">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>Scratchpad</span>
+          </button>
         </div>
 
-        <!-- Tab Bar -->
-        <div class="tab-bar">
-          <button class="tab-btn active" data-tab="tab-hypo">Hypotheses (<span id="countHypo">0</span>)</button>
-          <button class="tab-btn" data-tab="tab-tasks">Tasks (<span id="countTasks">0</span>)</button>
-          <button class="tab-btn" data-tab="tab-repomap">RepoMap</button>
-          <button class="tab-btn" data-tab="tab-dynamic-risk">Dynamic Risk</button>
-          <button class="tab-btn" data-tab="tab-guard">Hallucination Guard</button>
-          <button class="tab-btn" data-tab="tab-planner">Refactor Planner</button>
-          <button class="tab-btn" data-tab="tab-radar">Arch Radar</button>
-          <button class="tab-btn" data-tab="tab-packer">Context Packer</button>
-          <button class="tab-btn" data-tab="tab-ghost">Ghost Patch</button>
-          <button class="tab-btn" data-tab="tab-sentinel">Port Sentinel</button>
-          <button class="tab-btn" data-tab="tab-activity">Live Drift</button>
-          <button class="tab-btn" data-tab="tab-decisions">Decisions</button>
-          <button class="tab-btn" data-tab="tab-scratchpad">Scratchpad</button>
+        <div class="nav-section">
+          <span class="nav-section-title">SYSTEM SENTINEL</span>
+          <button class="nav-item" data-view="view-sentinel">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            <span>Port Sentinel</span>
+            <span class="nav-badge purple" id="badgePorts">0</span>
+          </button>
+          <button class="nav-item" data-view="view-radar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6a6 6 0 1 0 6 6 6 6 0 0 0-6-6z"/></svg>
+            <span>Arch Radar</span>
+          </button>
+          <button class="nav-item" data-view="view-activity">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Live Activity</span>
+          </button>
         </div>
 
-        <div class="tab-content">
-          <!-- 1. Hypotheses Tab -->
-          <div class="tab-pane active" id="tab-hypo">
-            <div class="pane-action-bar">
-              <input type="text" id="newHypoInput" placeholder="Add new hypothesis to test (e.g. 'Deadlock caused by worker pool')...">
-              <button class="btn btn-secondary btn-sm" id="addHypoBtn">+ Post Hypothesis</button>
-            </div>
-            <div class="card-list" id="hypoList">
-              <!-- Rendered via JS -->
-            </div>
-          </div>
+        <div class="sidebar-footer">
+          <button class="btn-sidebar-help" id="helpModalBtn" title="Keyboard Shortcuts (?)">
+            <kbd>?</kbd>
+            <span>Shortcuts</span>
+          </button>
+          <span class="sidebar-version">SQLite WAL Active</span>
+        </div>
+      </aside>
 
-          <!-- 2. Tasks Tab -->
-          <div class="tab-pane" id="tab-tasks">
-            <div class="pane-action-bar">
-              <input type="text" id="newTaskInput" placeholder="Add new task (e.g. 'Refactor parser error handling')...">
-              <button class="btn btn-secondary btn-sm" id="addTaskBtn">+ Add Task</button>
-            </div>
-            <div class="card-list" id="taskList">
-              <!-- Rendered via JS -->
-            </div>
-          </div>
+      <!-- Center Main Stage (Dynamic View Host) -->
+      <main class="main-stage">
 
-          <!-- 3. RepoMap Tab -->
-          <div class="tab-pane" id="tab-repomap">
-            <div class="pane-action-bar">
-              <span style="font-size:0.75rem;color:var(--text-dim);display:flex;align-items:center;">PageRank-weighted, token-budgeted structural map of entire codebase</span>
-              <input type="number" id="repoMapBudgetInput" value="1024" min="200" max="5000" step="128" style="width:90px;" title="Token Budget">
-              <button class="btn btn-primary btn-sm" id="genRepoMapBtn">Generate RepoMap</button>
-              <button class="btn-xs" id="copyRepoMapBtn" style="margin-left:8px;">Copy</button>
+        <!-- 1. VIEW: Code Graph (Interactive Canvas & Blast) -->
+        <section class="view-panel active" id="view-graph">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>CODEBASE CARTOGRAPHY & DEPENDENCY GRAPH</h2>
+              <span class="stage-subtitle">Force-directed topological map with PageRank centrality</span>
             </div>
-            <div class="packer-output-wrapper">
-              <div class="output-stats">
-                <span id="repoMapStats">Click Generate to compute PageRank-weighted symbol tree</span>
+            <!-- Floating Graph Bar Controls -->
+            <div class="graph-toolbar">
+              <div class="filter-group">
+                <span class="filter-label">Filter:</span>
+                <button class="chip-filter active" data-lang="all">All</button>
+                <button class="chip-filter" data-lang="python">Python</button>
+                <button class="chip-filter" data-lang="javascript">TS/JS</button>
+                <button class="chip-filter" data-lang="other">Polyglot</button>
               </div>
-              <textarea id="repoMapResult" readonly placeholder="# Repository map will appear here..." style="font-family:'Fira Code',monospace;min-height:280px;"></textarea>
+              <div class="graph-search-box">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="graphSearchInput" placeholder="Locate node..." class="search-input-xs">
+              </div>
+              <div class="zoom-controls">
+                <button class="btn-icon" id="zoomInBtn" title="Zoom In">+</button>
+                <button class="btn-icon" id="zoomOutBtn" title="Zoom Out">-</button>
+                <button class="btn-icon" id="resetZoomBtn" title="Reset View">Fit</button>
+              </div>
             </div>
           </div>
 
-          <!-- 4. Dynamic Risk Tab -->
-          <div class="tab-pane" id="tab-dynamic-risk">
-            <div class="pane-action-bar">
-              <input type="text" id="dynamicRiskSymbolInput" placeholder="Symbol name to audit (e.g. 'calculate_blast_radius')...">
-              <button class="btn btn-primary btn-sm" id="runDynamicRiskBtn">Audit Dynamic Risk</button>
+          <div class="canvas-workspace">
+            <canvas id="graphCanvas"></canvas>
+            <div class="canvas-legend">
+              <span class="legend-item"><span class="legend-dot green"></span> Safe (<3 callers)</span>
+              <span class="legend-item"><span class="legend-dot amber"></span> Moderate (3-7 callers)</span>
+              <span class="legend-item"><span class="legend-dot red"></span> High Blast (8+ callers)</span>
+              <span class="legend-hint">Scroll to zoom • Drag to pan • Click node to inspect</span>
+            </div>
+
+            <!-- Slide-Out Symbol Inspector Card -->
+            <div class="symbol-drawer" id="symbolDrawer">
+              <div class="drawer-header">
+                <div class="drawer-header-left">
+                  <span class="inspector-badge" id="inspectKind">FUNCTION</span>
+                  <h3 id="inspectTitle">Select a node to inspect</h3>
+                </div>
+                <div class="drawer-header-right">
+                  <span class="risk-pill" id="inspectRisk">RISK: --</span>
+                  <button class="btn-drawer-close" id="closeDrawerBtn" title="Close details">&times;</button>
+                </div>
+              </div>
+              <div class="drawer-body">
+                <div class="code-signature-block">
+                  <span class="code-signature-label">SIGNATURE</span>
+                  <pre class="code-signature" id="inspectSig">// Signature will appear here</pre>
+                </div>
+                <div class="drawer-meta-grid">
+                  <div class="meta-item"><span class="meta-label">File:</span> <span class="meta-val" id="inspectFile">--</span></div>
+                  <div class="meta-item"><span class="meta-label">Lines:</span> <span class="meta-val" id="inspectLines">--</span></div>
+                  <div class="meta-item"><span class="meta-label">Docstring:</span> <span class="meta-val" id="inspectDoc">--</span></div>
+                  <div class="meta-item"><span class="meta-label">Impacted Callers:</span> <span class="meta-val" id="inspectBlastCount">--</span></div>
+                </div>
+                <div class="drawer-actions">
+                  <button class="btn btn-secondary btn-sm" id="actionSimBlast">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/></svg>
+                    Simulate Blast
+                  </button>
+                  <button class="btn btn-secondary btn-sm" id="actionPackContext">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/></svg>
+                    Pack Context
+                  </button>
+                  <button class="btn btn-secondary btn-sm" id="actionAuditRisk">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    Audit Dynamic Risk
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. VIEW: RepoMap Explorer -->
+        <section class="view-panel" id="view-repomap">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>PAGERANK REPOSITORY MAP</h2>
+              <span class="stage-subtitle">Aider-style structural tree prioritized by graph centrality under a strict token budget</span>
+            </div>
+            <div class="stage-actions">
+              <label class="input-label-inline">Token Budget:
+                <input type="number" id="repoMapBudgetInput" value="1024" min="256" max="5000" step="128" class="input-xs">
+              </label>
+              <button class="btn btn-primary btn-sm" id="genRepoMapBtn">Compute RepoMap</button>
+              <button class="btn btn-secondary btn-sm" id="copyRepoMapBtn">Copy Map</button>
+            </div>
+          </div>
+          <div class="content-scrollable">
+            <div class="output-header-bar">
+              <span class="status-summary" id="repoMapStats">Ready to compute PageRank structural tree</span>
+            </div>
+            <div class="code-editor-container">
+              <textarea id="repoMapResult" readonly class="code-area-full" placeholder="# Click 'Compute RepoMap' to generate structural tree..."></textarea>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. VIEW: Context Slicer / Packer -->
+        <section class="view-panel" id="view-packer">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>CONTEXT PACKER & AST PRUNER</h2>
+              <span class="stage-subtitle">Extracts target function body while pruning sibling functions to stubs (~90% token reduction)</span>
+            </div>
+            <div class="stage-actions">
+              <input type="text" id="packerQuery" placeholder="Target symbol or module (e.g. 'calculate_blast_radius')..." class="input-md" style="width:280px;">
+              <label class="input-label-inline">Budget:
+                <input type="number" id="packerBudget" value="1200" min="200" max="5000" step="100" class="input-xs">
+              </label>
+              <button class="btn btn-primary btn-sm" id="packBtn">Slice AST</button>
+              <button class="btn btn-secondary btn-sm" id="copySliceBtn">Copy Slice</button>
+            </div>
+          </div>
+          <div class="content-scrollable">
+            <div class="output-header-bar">
+              <span class="status-summary" id="packStats">Enter symbol name and click Slice AST</span>
+            </div>
+            <div class="code-editor-container">
+              <textarea id="packerResult" readonly class="code-area-full" placeholder="// Sliced prompt context with full target implementation and stubbed siblings will appear here..."></textarea>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. VIEW: Blast Radius -->
+        <section class="view-panel" id="view-blast">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>TRANSITIVE BLAST RADIUS SIMULATOR</h2>
+              <span class="stage-subtitle">Maps downstream callers and discovers related test suites via reverse BFS traversal</span>
+            </div>
+            <div class="stage-actions">
+              <input type="text" id="blastFileInput" placeholder="File path (e.g. 'agent_lens/core/cartography.py')..." class="input-md" style="width:260px;">
+              <input type="text" id="blastSymbolInput" placeholder="Symbol (optional)..." class="input-sm" style="width:160px;">
+              <button class="btn btn-primary btn-sm" id="runBlastBtn">Simulate Blast</button>
+            </div>
+          </div>
+          <div class="content-scrollable">
+            <div class="card-list" id="blastResultsList">
+              <div class="empty-state">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/></svg>
+                <h3>No Blast Simulation Active</h3>
+                <p>Enter a target file and symbol above to calculate downstream caller impact and find relevant test files.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. VIEW: Dynamic Risk Audit -->
+        <section class="view-panel" id="view-dynamic-risk">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>DYNAMIC RISK AUDITOR</h2>
+              <span class="stage-subtitle">Audits codebase for reflection (getattr/hasattr), dynamic registry lookups, and duck typing</span>
+            </div>
+            <div class="stage-actions">
+              <input type="text" id="dynamicRiskSymbolInput" placeholder="Symbol name (e.g. 'calculate_blast_radius')..." class="input-md" style="width:280px;">
+              <button class="btn btn-primary btn-sm" id="runDynamicRiskBtn">Audit Symbol</button>
+            </div>
+          </div>
+          <div class="content-scrollable">
+            <div class="preset-chips-bar">
+              <span class="preset-label">Quick audit:</span>
+              <button class="chip-preset" onclick="setAndAuditRisk('calculate_blast_radius')">calculate_blast_radius</button>
+              <button class="chip-preset" onclick="setAndAuditRisk('detect_language')">detect_language</button>
+              <button class="chip-preset" onclick="setAndAuditRisk('do_GET')">do_GET</button>
+              <button class="chip-preset" onclick="setAndAuditRisk('get')">get (common)</button>
             </div>
             <div class="card-list" id="dynamicRiskResultsList">
-              <div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">Audits target symbol for getattr/hasattr reflection, string-based lookups, and unimported attribute access.</div>
+              <div class="empty-state">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <h3>Audit Dynamic Risk</h3>
+                <p>Audits a symbol for non-static references like <code>getattr(obj, 'sym')</code>, registry tables, and unimported attribute calls.</p>
+              </div>
             </div>
           </div>
+        </section>
 
-          <!-- 3. Hallucination Guard Tab -->
-          <div class="tab-pane" id="tab-guard">
-            <div class="pane-action-bar">
-              <input type="text" id="guardFileInput" placeholder="Target file to check (e.g. 'agent_lens/cli.py')...">
+        <!-- 6. VIEW: Hallucination Guard -->
+        <section class="view-panel" id="view-guard">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>HALLUCINATION GUARD</h2>
+              <span class="stage-subtitle">Cross-checks all imports and method calls against workspace exports and stdlib</span>
+            </div>
+            <div class="stage-actions">
+              <input type="text" id="guardFileInput" placeholder="File to verify (e.g. 'agent_lens/cli.py')..." class="input-md" style="width:280px;">
               <button class="btn btn-primary btn-sm" id="runGuardBtn">Verify File</button>
             </div>
+          </div>
+          <div class="content-scrollable">
             <div class="card-list" id="guardResultsList">
-              <div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">Enter a file path above to check for non-existent imports, missing methods, or symbol hallucinations.</div>
+              <div class="empty-state">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <h3>Verify File Integrity</h3>
+                <p>Validates that every imported symbol and module exists, preventing phantom imports and method hallucinations.</p>
+              </div>
             </div>
           </div>
+        </section>
 
-          <!-- 4. Refactor Planner Tab -->
-          <div class="tab-pane" id="tab-planner">
-            <div class="pane-action-bar" style="flex-wrap:wrap;">
-              <input type="text" id="planFileInput" placeholder="Target file (e.g. 'agent_lens/core/cartography.py')..." style="flex:2;">
-              <input type="text" id="planSymbolInput" placeholder="Symbol (optional)..." style="flex:1;">
-              <input type="text" id="planObjInput" placeholder="Objective (e.g. 'Add async indexing')..." style="flex:2;">
-              <button class="btn btn-primary btn-sm" id="runPlanBtn">Generate DAG Plan</button>
+        <!-- 7. VIEW: Ghost Patch Dry-Run -->
+        <section class="view-panel" id="view-ghost">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>GHOST PATCH IN-MEMORY DRY-RUN</h2>
+              <span class="stage-subtitle">Parses proposed modifications in memory, validates syntax, and verifies caller signatures</span>
             </div>
+            <div class="stage-actions">
+              <input type="text" id="ghostFile" placeholder="Target file (e.g. 'agent_lens/core/parser.py')..." class="input-md" style="width:280px;">
+              <button class="btn btn-primary btn-sm" id="ghostTestBtn">Dry-Run Patch</button>
+            </div>
+          </div>
+          <div class="content-scrollable">
+            <div class="split-editor-layout">
+              <div class="editor-pane">
+                <span class="editor-label">PROPOSED REPLACEMENT CODE / DIFF</span>
+                <textarea id="ghostContent" class="code-area-full" placeholder="// Paste proposed new file code or search/replace block here to test before touching disk..."></textarea>
+              </div>
+              <div class="verdict-pane">
+                <span class="editor-label">SAFETY & DRIFT VERDICT</span>
+                <div class="verdict-banner waiting" id="ghostVerdict">Verdict: Waiting for patch input</div>
+                <div class="verdict-details" id="ghostVerdictDetails">
+                  <p class="muted-note">GhostPatch verifies syntax in AST and checks if the patch breaks any known callers across the codebase without making any disk writes.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 8. VIEW: Refactor Planner -->
+        <section class="view-panel" id="view-planner">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>REFACTOR DAG PLANNER</h2>
+              <span class="stage-subtitle">Generates dependency-ordered refactoring execution plans with test recommendations</span>
+            </div>
+            <div class="stage-actions">
+              <input type="text" id="planFileInput" placeholder="File (e.g. 'agent_lens/core/cartography.py')..." class="input-md" style="width:240px;">
+              <input type="text" id="planSymbolInput" placeholder="Symbol (optional)..." class="input-sm" style="width:140px;">
+              <input type="text" id="planObjInput" placeholder="Objective (e.g. 'Add async scan')..." class="input-md" style="width:200px;">
+              <button class="btn btn-primary btn-sm" id="runPlanBtn">Generate Plan</button>
+            </div>
+          </div>
+          <div class="content-scrollable">
             <div class="card-list" id="planResultsList">
-              <div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">Enter target module and objective to generate a step-by-step, topologically sorted refactor plan.</div>
+              <div class="empty-state">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/></svg>
+                <h3>Generate Refactoring Plan</h3>
+                <p>Calculates topological execution sequence so callers and dependencies are updated in the correct order.</p>
+              </div>
             </div>
           </div>
+        </section>
 
-          <!-- 5. Architecture Radar Tab -->
-          <div class="tab-pane" id="tab-radar">
+        <!-- 9. VIEW: Hypotheses -->
+        <section class="view-panel" id="view-hypo">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>AGENT REASONING HYPOTHESES</h2>
+              <span class="stage-subtitle">Persistent reasoning flight recorder stored in SQLite (<code>.agentlens/memory.db</code>)</span>
+            </div>
+            <div class="stage-actions">
+              <input type="text" id="newHypoInput" placeholder="Add hypothesis (e.g. 'Deadlock caused by worker pool lock')..." class="input-md" style="width:360px;">
+              <button class="btn btn-primary btn-sm" id="addHypoBtn">+ Post Hypothesis</button>
+            </div>
+          </div>
+          <div class="content-scrollable">
+            <div class="card-list" id="hypoList"></div>
+          </div>
+        </section>
+
+        <!-- 10. VIEW: Tasks -->
+        <section class="view-panel" id="view-tasks">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>AGENT TASK CHECKLIST</h2>
+              <span class="stage-subtitle">Actionable milestones coordinated between human developer and AI agents</span>
+            </div>
+            <div class="stage-actions">
+              <input type="text" id="newTaskInput" placeholder="Add new task (e.g. 'Refactor parser error handling')..." class="input-md" style="width:340px;">
+              <button class="btn btn-primary btn-sm" id="addTaskBtn">+ Add Task</button>
+            </div>
+          </div>
+          <div class="content-scrollable">
+            <div class="card-list" id="taskList"></div>
+          </div>
+        </section>
+
+        <!-- 11. VIEW: Decisions -->
+        <section class="view-panel" id="view-decisions">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>ARCHITECTURAL DECISIONS LOG</h2>
+              <span class="stage-subtitle">Persistent record of rationale and trade-offs to prevent context loss during compactions</span>
+            </div>
+          </div>
+          <div class="content-scrollable">
+            <div class="card-list" id="decisionsList"></div>
+          </div>
+        </section>
+
+        <!-- 12. VIEW: Scratchpad -->
+        <section class="view-panel" id="view-scratchpad">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>SHARED HUMAN-AGENT SCRATCHPAD</h2>
+              <span class="stage-subtitle">Real-time collaborative working document synced live across agent turns and dashboard</span>
+            </div>
+            <div class="stage-actions">
+              <span class="save-indicator" id="scratchSavedIndicator">Synced to SQLite</span>
+              <button class="btn btn-primary btn-sm" id="saveScratchBtn">Save Pad</button>
+            </div>
+          </div>
+          <div class="content-scrollable" style="display:flex;flex-direction:column;flex:1;">
+            <textarea id="scratchpadArea" class="scratchpad-full" placeholder="Drop notes, error logs, snippets, or instructions here..."></textarea>
+          </div>
+        </section>
+
+        <!-- 13. VIEW: Port Sentinel -->
+        <section class="view-panel" id="view-sentinel">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>DEV PORT SENTINEL & PROCESS MANAGER</h2>
+              <span class="stage-subtitle">Scans listening dev ports and safely terminates orphaned servers with two-phase confirmation</span>
+            </div>
+            <div class="stage-actions">
+              <button class="btn btn-secondary btn-sm" id="refreshPortsBtn">Refresh Ports</button>
+            </div>
+          </div>
+          <div class="content-scrollable">
+            <div class="card-list" id="portsList"></div>
+          </div>
+        </section>
+
+        <!-- 14. VIEW: Arch Radar -->
+        <section class="view-panel" id="view-radar">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>ARCHITECTURE RADAR & HEALTH</h2>
+              <span class="stage-subtitle">Automatic detection of circular import cycles, God Nodes, and candidate orphan code</span>
+            </div>
+          </div>
+          <div class="content-scrollable">
             <div class="radar-score-banner">
               <div class="score-circle" id="radarScoreCircle">--</div>
               <div>
                 <h3 id="radarStatusText">Architecture Health</h3>
-                <p style="font-size:0.75rem;color:var(--text-dim)">Scans circular imports, God Nodes, and orphan symbols</p>
+                <p class="radar-desc">Continuous structural audit over the directed dependency graph.</p>
               </div>
             </div>
-            <div class="card-list" id="radarDetailsList" style="margin-top:12px;">
-              <!-- Rendered via JS -->
-            </div>
+            <div class="card-list" id="radarDetailsList" style="margin-top:16px;"></div>
           </div>
+        </section>
 
-          <!-- 6. Context Packer Tab -->
-          <div class="tab-pane" id="tab-packer">
-            <div class="packer-controls">
-              <input type="text" id="packerQuery" placeholder="Target symbol or module (e.g. 'calculate_blast_radius')...">
-              <input type="number" id="packerBudget" value="1200" min="200" max="5000" step="100" style="width:90px;" title="Token Budget">
-              <button class="btn btn-primary btn-sm" id="packBtn">Slice AST</button>
-            </div>
-            <div class="packer-output-wrapper">
-              <div class="output-stats">
-                <span id="packStats">Enter symbol and budget to generate token-pruned slice</span>
-                <button class="btn-xs" id="copySliceBtn">Copy Slice</button>
-              </div>
-              <textarea id="packerResult" readonly placeholder="// Sliced prompt context will appear here..."></textarea>
+        <!-- 15. VIEW: Live File Drift -->
+        <section class="view-panel" id="view-activity">
+          <div class="stage-header">
+            <div class="stage-title">
+              <h2>LIVE DRIFT & FILE WATCHER STREAM</h2>
+              <span class="stage-subtitle">Real-time event stream of filesystem modifications captured by background watcher</span>
             </div>
           </div>
+          <div class="content-scrollable">
+            <div class="card-list" id="activityList"></div>
+          </div>
+        </section>
 
-          <!-- 7. Ghost Patch Sandbox Tab -->
-          <div class="tab-pane" id="tab-ghost">
-            <div class="ghost-controls">
-              <input type="text" id="ghostFile" placeholder="Target file (e.g. 'agent_lens/core/parser.py')...">
-              <button class="btn btn-primary btn-sm" id="ghostTestBtn">Dry-Run Patch</button>
-            </div>
-            <div class="ghost-editor-wrapper">
-              <textarea id="ghostContent" placeholder="// Paste proposed new file code here to test before touching disk..."></textarea>
-              <div class="verdict-banner" id="ghostVerdict">Verdict: Waiting for input</div>
-            </div>
-          </div>
-
-          <!-- 8. Port Sentinel Tab -->
-          <div class="tab-pane" id="tab-sentinel">
-            <div class="pane-action-bar">
-              <span style="font-size:0.75rem;color:var(--text-dim);display:flex;align-items:center;">Monitors dev servers & terminates orphaned listeners</span>
-              <button class="btn btn-secondary btn-sm" id="refreshPortsBtn" style="margin-left:auto;">Refresh Ports</button>
-            </div>
-            <div class="card-list" id="portsList">
-              <!-- Rendered via JS -->
-            </div>
-          </div>
-
-          <!-- 9. Live Drift / Watcher Tab -->
-          <div class="tab-pane" id="tab-activity">
-            <div class="pane-action-bar">
-              <span style="font-size:0.75rem;color:var(--text-dim);">Live file change stream captured by background watcher</span>
-            </div>
-            <div class="card-list" id="activityList">
-              <!-- Rendered via JS -->
-            </div>
-          </div>
-
-          <!-- 10. Decisions Tab -->
-          <div class="tab-pane" id="tab-decisions">
-            <div class="card-list" id="decisionsList">
-              <!-- Rendered via JS -->
-            </div>
-          </div>
-
-          <!-- 11. Scratchpad Tab -->
-          <div class="tab-pane" id="tab-scratchpad">
-            <div class="scratchpad-header">
-              <span>Collaborative note board between Human & Agent. Synced live to <code>.agentlens/memory.db</code>.</span>
-              <button class="btn btn-primary btn-sm" id="saveScratchBtn">Save Pad</button>
-            </div>
-            <textarea id="scratchpadArea" placeholder="Drop notes, logs, requirements or snippets here..."></textarea>
-          </div>
-        </div>
-      </section>
-    </main>
+      </main>
+    </div>
   </div>
 
+  <!-- Global Command Palette Modal (Ctrl+K) -->
+  <dialog class="cmd-modal" id="cmdModal" aria-modal="true" aria-labelledby="cmdInput">
+    <div class="cmd-dialog-content">
+      <div class="cmd-search-header">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="cmdInput" placeholder="Search symbols, navigate views, run actions..." autocomplete="off">
+        <kbd class="cmd-badge-esc" id="closeCmdBtn">ESC</kbd>
+      </div>
+      <div class="cmd-results-list" id="cmdResultsList">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="cmd-footer">
+        <span><kbd>↑</kbd> <kbd>↓</kbd> Navigate</span>
+        <span><kbd>↵</kbd> Select</span>
+        <span><kbd>ESC</kbd> Close</span>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Keyboard Shortcuts Cheatsheet Modal -->
+  <dialog class="help-modal" id="helpModal" aria-modal="true">
+    <div class="help-dialog-content">
+      <div class="help-header">
+        <h3>Keyboard Shortcuts & Navigation</h3>
+        <button class="btn-drawer-close" id="closeHelpBtn">&times;</button>
+      </div>
+      <div class="help-body">
+        <div class="help-row"><span class="help-key"><kbd>Ctrl</kbd> + <kbd>K</kbd></span> <span class="help-desc">Open Global Command Palette</span></div>
+        <div class="help-row"><span class="help-key"><kbd>1</kbd> - <kbd>5</kbd></span> <span class="help-desc">Quick jump across main views</span></div>
+        <div class="help-row"><span class="help-key"><kbd>R</kbd></span> <span class="help-desc">Trigger AST re-scan</span></div>
+        <div class="help-row"><span class="help-key"><kbd>B</kbd></span> <span class="help-desc">Copy Agent Recovery Briefing</span></div>
+        <div class="help-row"><span class="help-key"><kbd>?</kbd></span> <span class="help-desc">Toggle this shortcuts dialog</span></div>
+      </div>
+    </div>
+  </dialog>
+
   <!-- Notification Toast -->
-  <div id="toast" class="toast">Briefing copied to clipboard!</div>
+  <div id="toast" class="toast" role="status" aria-live="polite">Briefing copied to clipboard!</div>
 
   <script src="app.js"></script>
 </body>

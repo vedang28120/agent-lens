@@ -1,29 +1,46 @@
-// AgentLens Mission Control Client Engine
+// ==========================================================================
+// AgentLens Mission Control Client Engine (UI/UX 2.0)
+// ==========================================================================
+
 document.addEventListener('DOMContentLoaded', () => {
-  // Elements
+  // Navigation & View Router
+  const navItems = document.querySelectorAll('.nav-item');
+  const viewPanels = document.querySelectorAll('.view-panel');
+
+  // Vital Metric Badges
   const valFiles = document.getElementById('valFiles');
   const valSymbols = document.getElementById('valSymbols');
   const valHealth = document.getElementById('valHealth');
   const valHypo = document.getElementById('valHypo');
   const valPorts = document.getElementById('valPorts');
+  const badgePorts = document.getElementById('badgePorts');
+  const countHypo = document.getElementById('countHypo');
+  const countTasks = document.getElementById('countTasks');
+
+  // Connection & Header Actions
   const connStatus = document.getElementById('connStatus');
   const connBadge = document.getElementById('connBadge');
   const rescanBtn = document.getElementById('rescanBtn');
   const copyBriefBtn = document.getElementById('copyBriefBtn');
   const toast = document.getElementById('toast');
 
-  // Tabs
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabPanes = document.querySelectorAll('.tab-pane');
-  const countHypo = document.getElementById('countHypo');
-  const countTasks = document.getElementById('countTasks');
+  // Command Palette & Help Modals
+  const cmdPaletteTrigger = document.getElementById('cmdPaletteTrigger');
+  const cmdModal = document.getElementById('cmdModal');
+  const cmdInput = document.getElementById('cmdInput');
+  const cmdResultsList = document.getElementById('cmdResultsList');
+  const closeCmdBtn = document.getElementById('closeCmdBtn');
+  const helpModalBtn = document.getElementById('helpModalBtn');
+  const helpModal = document.getElementById('helpModal');
+  const closeHelpBtn = document.getElementById('closeHelpBtn');
 
-  // Lists
+  // Lists & Containers
   const hypoList = document.getElementById('hypoList');
   const taskList = document.getElementById('taskList');
   const decisionsList = document.getElementById('decisionsList');
   const scratchpadArea = document.getElementById('scratchpadArea');
   const saveScratchBtn = document.getElementById('saveScratchBtn');
+  const scratchSavedIndicator = document.getElementById('scratchSavedIndicator');
   const radarDetailsList = document.getElementById('radarDetailsList');
   const radarScoreCircle = document.getElementById('radarScoreCircle');
   const radarStatusText = document.getElementById('radarStatusText');
@@ -31,37 +48,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const refreshPortsBtn = document.getElementById('refreshPortsBtn');
   const activityList = document.getElementById('activityList');
 
-  // Inputs
+  // Inputs & Actions
   const newHypoInput = document.getElementById('newHypoInput');
   const addHypoBtn = document.getElementById('addHypoBtn');
   const newTaskInput = document.getElementById('newTaskInput');
   const addTaskBtn = document.getElementById('addTaskBtn');
 
-  // RepoMap
+  // RepoMap Elements
   const repoMapBudgetInput = document.getElementById('repoMapBudgetInput');
   const genRepoMapBtn = document.getElementById('genRepoMapBtn');
   const copyRepoMapBtn = document.getElementById('copyRepoMapBtn');
   const repoMapStats = document.getElementById('repoMapStats');
   const repoMapResult = document.getElementById('repoMapResult');
 
-  // Dynamic Risk
-  const dynamicRiskSymbolInput = document.getElementById('dynamicRiskSymbolInput');
-  const runDynamicRiskBtn = document.getElementById('runDynamicRiskBtn');
-  const dynamicRiskResultsList = document.getElementById('dynamicRiskResultsList');
-
-  // Guard
-  const guardFileInput = document.getElementById('guardFileInput');
-  const runGuardBtn = document.getElementById('runGuardBtn');
-  const guardResultsList = document.getElementById('guardResultsList');
-
-  // Planner
-  const planFileInput = document.getElementById('planFileInput');
-  const planSymbolInput = document.getElementById('planSymbolInput');
-  const planObjInput = document.getElementById('planObjInput');
-  const runPlanBtn = document.getElementById('runPlanBtn');
-  const planResultsList = document.getElementById('planResultsList');
-
-  // Packer
+  // Context Packer Elements
   const packerQuery = document.getElementById('packerQuery');
   const packerBudget = document.getElementById('packerBudget');
   const packBtn = document.getElementById('packBtn');
@@ -69,14 +69,47 @@ document.addEventListener('DOMContentLoaded', () => {
   const packStats = document.getElementById('packStats');
   const copySliceBtn = document.getElementById('copySliceBtn');
 
-  // Ghost Patch
+  // Blast Elements
+  const blastFileInput = document.getElementById('blastFileInput');
+  const blastSymbolInput = document.getElementById('blastSymbolInput');
+  const runBlastBtn = document.getElementById('runBlastBtn');
+  const blastResultsList = document.getElementById('blastResultsList');
+
+  // Dynamic Risk Elements
+  const dynamicRiskSymbolInput = document.getElementById('dynamicRiskSymbolInput');
+  const runDynamicRiskBtn = document.getElementById('runDynamicRiskBtn');
+  const dynamicRiskResultsList = document.getElementById('dynamicRiskResultsList');
+
+  // Hallucination Guard Elements
+  const guardFileInput = document.getElementById('guardFileInput');
+  const runGuardBtn = document.getElementById('runGuardBtn');
+  const guardResultsList = document.getElementById('guardResultsList');
+
+  // Ghost Patch Elements
   const ghostFile = document.getElementById('ghostFile');
   const ghostContent = document.getElementById('ghostContent');
   const ghostTestBtn = document.getElementById('ghostTestBtn');
   const ghostVerdict = document.getElementById('ghostVerdict');
+  const ghostVerdictDetails = document.getElementById('ghostVerdictDetails');
 
-  // Inspector & Search
+  // Planner Elements
+  const planFileInput = document.getElementById('planFileInput');
+  const planSymbolInput = document.getElementById('planSymbolInput');
+  const planObjInput = document.getElementById('planObjInput');
+  const runPlanBtn = document.getElementById('runPlanBtn');
+  const planResultsList = document.getElementById('planResultsList');
+
+  // Graph Canvas & Drawer Elements
+  const canvas = document.getElementById('graphCanvas');
+  const ctx = canvas.getContext('2d');
   const graphSearchInput = document.getElementById('graphSearchInput');
+  const zoomInBtn = document.getElementById('zoomInBtn');
+  const zoomOutBtn = document.getElementById('zoomOutBtn');
+  const resetZoomBtn = document.getElementById('resetZoomBtn');
+  const chipFilters = document.querySelectorAll('.chip-filter');
+
+  const symbolDrawer = document.getElementById('symbolDrawer');
+  const closeDrawerBtn = document.getElementById('closeDrawerBtn');
   const inspectTitle = document.getElementById('inspectTitle');
   const inspectKind = document.getElementById('inspectKind');
   const inspectRisk = document.getElementById('inspectRisk');
@@ -85,58 +118,93 @@ document.addEventListener('DOMContentLoaded', () => {
   const inspectLines = document.getElementById('inspectLines');
   const inspectDoc = document.getElementById('inspectDoc');
   const inspectBlastCount = document.getElementById('inspectBlastCount');
+  const actionSimBlast = document.getElementById('actionSimBlast');
+  const actionPackContext = document.getElementById('actionPackContext');
+  const actionAuditRisk = document.getElementById('actionAuditRisk');
 
-  // Canvas
-  const canvas = document.getElementById('graphCanvas');
-  const ctx = canvas.getContext('2d');
-  const resetZoomBtn = document.getElementById('resetZoomBtn');
-
+  // Shared State
   let memoryData = null;
   let graphData = { nodes: [], links: [] };
   let selectedNode = null;
-  let highlightedNodes = new Set();
+  let activeLanguageFilter = 'all';
   let activities = [];
+  let cmdItems = [];
+  let activeCmdIndex = 0;
 
-  // Graph Simulation State
-  let width = canvas.clientWidth;
-  let height = canvas.clientHeight;
-  let transform = { x: 0, y: 0, k: 1 };
-  let isDraggingCanvas = false;
-  let dragStart = { x: 0, y: 0 };
-  let draggedNode = null;
+  // --------------------------------------------------------------------------
+  // Navigation & View Router
+  // --------------------------------------------------------------------------
 
-  function resizeCanvas() {
-    width = canvas.parentElement.clientWidth;
-    height = canvas.parentElement.clientHeight;
-    canvas.width = width * window.devicePixelRatio;
-    canvas.height = height * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  function switchView(viewId) {
+    navItems.forEach(item => {
+      if (item.getAttribute('data-view') === viewId) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+
+    viewPanels.forEach(panel => {
+      if (panel.id === viewId) {
+        panel.classList.add('active');
+      } else {
+        panel.classList.remove('active');
+      }
+    });
+
+    if (viewId === 'view-graph') {
+      resizeCanvas();
+    }
   }
-  window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
 
-  // --- API Calls ---
+  navItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const viewId = item.getAttribute('data-view');
+      switchView(viewId);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Toast Notifications
+  // --------------------------------------------------------------------------
+
+  let toastTimeout;
+  function showToast(msg) {
+    clearTimeout(toastTimeout);
+    toast.textContent = msg;
+    toast.classList.add('show');
+    toastTimeout = setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2800);
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  // --------------------------------------------------------------------------
+  // Server API & Polling
+  // --------------------------------------------------------------------------
 
   async function fetchStatus() {
     try {
       const res = await fetch('/api/status');
       const data = await res.json();
-      valFiles.textContent = data.files_count || 0;
-      valSymbols.textContent = data.symbols_count || 0;
-      valHypo.textContent = data.hypotheses_count !== undefined ? data.hypotheses_count : 0;
-      if (valPorts) valPorts.textContent = data.ports_count !== undefined ? data.ports_count : '--';
+      valFiles.textContent = data.files_count;
+      valSymbols.textContent = data.symbols_count;
+      valHypo.textContent = data.hypotheses_count;
+      valPorts.textContent = `${data.ports_count} Active`;
+      badgePorts.textContent = data.ports_count;
+      countHypo.textContent = data.hypotheses_count;
+      countTasks.textContent = data.tasks_count;
     } catch (e) {
       console.error("Status fetch error", e);
-    }
-  }
-
-  async function fetchMemory() {
-    try {
-      const res = await fetch('/api/memory');
-      memoryData = await res.json();
-      renderMemory();
-    } catch (e) {
-      console.error("Memory fetch error", e);
     }
   }
 
@@ -168,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="item-top">
             <span class="status-badge refuted">CIRCULAR DEPENDENCIES (${data.circular_count})</span>
           </div>
-          <div style="font-size:0.75rem;color:var(--accent-red);margin-top:4px;">
+          <div style="font-size:0.75rem;color:var(--accent-rose);margin-top:4px;font-family:var(--font-mono);">
             ${data.circular_dependencies.map(c => `• ${escapeHtml(c.join(' -> '))}`).join('<br>')}
           </div>
         `;
@@ -187,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="item-top">
             <span class="status-badge exploring">HIGHLY COUPLED GOD NODES</span>
           </div>
-          <div style="font-size:0.75rem;color:var(--text-main);margin-top:4px;">
+          <div style="font-size:0.75rem;color:var(--text-primary);margin-top:4px;">
             ${data.god_nodes.map(g => `• <strong>${escapeHtml(g.file)}</strong> (${g.in_degree} incoming deps, ${g.lines} lines, ${g.risk} risk)`).join('<br>')}
           </div>
         `;
@@ -201,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="item-top">
             <span class="status-badge pending">ORPHAN / CANDIDATE DEAD CODE (${data.orphan_count})</span>
           </div>
-          <div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;font-family:var(--font-mono);">
             ${data.orphan_symbols.slice(0, 6).map(o => `• <code>${escapeHtml(o.symbol)}</code> (${escapeHtml(o.file)}:${o.line})`).join('<br>')}
           </div>
         `;
@@ -215,11 +283,19 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchPorts() {
     try {
       const res = await fetch('/api/ports');
-      const ports = await res.json();
+      const data = await res.json();
+      const ports = data.ports || data;
       valPorts.textContent = `${ports.filter(p => p.is_dev_port).length} Active`;
+      badgePorts.textContent = ports.filter(p => p.is_dev_port).length;
       portsList.innerHTML = '';
-      if (ports.length === 0) {
-        portsList.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">No active listening ports found.</div>';
+      if (!ports || ports.length === 0) {
+        portsList.innerHTML = `
+          <div class="empty-state">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/></svg>
+            <h3>No Listening Ports Found</h3>
+            <p>No active listening dev servers detected.</p>
+          </div>
+        `;
         return;
       }
       ports.forEach(p => {
@@ -228,11 +304,14 @@ document.addEventListener('DOMContentLoaded', () => {
         card.innerHTML = `
           <div class="item-top">
             <span class="status-badge ${p.is_dev_port ? 'exploring' : 'pending'}">PORT ${p.port}</span>
-            <span style="font-size:0.75rem;color:var(--text-muted)">PID ${p.pid}</span>
+            <span style="font-size:0.75rem;color:var(--text-muted);font-family:var(--font-mono);">PID ${p.pid}</span>
           </div>
-          <div style="font-size:0.8rem;color:var(--accent-cyan);">${escapeHtml(p.process_name)}</div>
+          <div style="font-size:0.85rem;color:var(--accent-cyan);font-family:var(--font-mono);font-weight:600;">${escapeHtml(p.process_name)}</div>
+          <div style="font-size:0.75rem;color:var(--text-secondary);">${escapeHtml(p.address || '0.0.0.0')}</div>
           <div class="item-actions">
-            <button class="btn-xs" style="color:var(--accent-red)" onclick="killPort(${p.port})">Terminate</button>
+            <button class="btn btn-secondary btn-xs" style="color:var(--accent-rose);border-color:rgba(244,63,94,0.3);" onclick="killPort(${p.port})">
+              Terminate (Safe Confirm)
+            </button>
           </div>
         `;
         portsList.appendChild(card);
@@ -245,7 +324,8 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchActivity() {
     try {
       const res = await fetch('/api/activity');
-      activities = await res.json();
+      const data = await res.json();
+      activities = data.activities || data;
       renderActivity();
     } catch (e) {
       console.error("Activity fetch error", e);
@@ -254,60 +334,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderActivity() {
     activityList.innerHTML = '';
-    if (activities.length === 0) {
-      activityList.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">No recent file modifications detected by watcher.</div>';
+    if (!activities || activities.length === 0) {
+      activityList.innerHTML = `
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <h3>No Live Drift Recorded</h3>
+          <p>Filesystem events captured by the background watcher will appear here.</p>
+        </div>
+      `;
       return;
     }
-    activities.slice().reverse().forEach(a => {
+
+    activities.slice().reverse().forEach(act => {
       const card = document.createElement('div');
       card.className = 'item-card';
-      const timeStr = new Date(a.timestamp * 1000).toLocaleTimeString();
+      const timeStr = act.timestamp ? new Date(act.timestamp * 1000).toLocaleTimeString() : '';
       card.innerHTML = `
         <div class="item-top">
-          <span class="status-badge ${a.type === 'modified' ? 'exploring' : (a.type === 'created' ? 'confirmed' : 'refuted')}">${a.type}</span>
-          <span style="font-size:0.7rem;color:var(--text-dim)">${timeStr}</span>
+          <span class="status-badge ${act.event_type === 'created' ? 'confirmed' : 'exploring'}">${act.event_type}</span>
+          <span style="font-size:0.7rem;color:var(--text-muted);font-family:var(--font-mono);">${timeStr}</span>
         </div>
-        <div style="font-family:var(--font-code);font-size:0.75rem;color:var(--accent-cyan);">${escapeHtml(a.file)}</div>
+        <div style="font-size:0.8rem;color:var(--text-primary);font-family:var(--font-mono);">${escapeHtml(act.file)}</div>
       `;
       activityList.appendChild(card);
     });
   }
 
-  // --- Real-time SSE ---
-  function connectSSE() {
-    const sse = new EventSource('/api/events');
-    sse.onopen = () => {
-      connStatus.textContent = 'SYNCED (LIVE SSE)';
-      connBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-    };
-    sse.addEventListener('memory_update', () => {
-      fetchMemory();
-      fetchStatus();
-    });
-    sse.addEventListener('scan_complete', () => {
-      fetchStatus();
-      fetchGraph();
-      fetchRadar();
-    });
-    sse.addEventListener('ports_update', () => {
-      fetchPorts();
-    });
-    sse.addEventListener('file_activity', (e) => {
-      try {
-        const item = JSON.parse(e.data);
-        activities.push(item);
-        if (activities.length > 50) activities.shift();
-        renderActivity();
-        fetchStatus();
-      } catch (err) {}
-    });
-    sse.onerror = () => {
-      connStatus.textContent = 'RECONNECTING...';
-      connBadge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-    };
+  async function fetchMemory() {
+    try {
+      const res = await fetch('/api/memory');
+      memoryData = await res.json();
+      renderMemory();
+    } catch (e) {
+      console.error("Memory fetch error", e);
+    }
   }
-
-  // --- Render Memory Panels ---
 
   function renderMemory() {
     if (!memoryData) return;
@@ -317,23 +378,26 @@ document.addEventListener('DOMContentLoaded', () => {
     countHypo.textContent = hypos.length;
     hypoList.innerHTML = '';
     if (hypos.length === 0) {
-      hypoList.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">No active hypotheses. Post one above to track debugging theories.</div>';
+      hypoList.innerHTML = `
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+          <h3>No Hypotheses Logged</h3>
+          <p>Post a reasoning hypothesis above to track architectural or debugging claims.</p>
+        </div>
+      `;
     } else {
       hypos.forEach(h => {
         const card = document.createElement('div');
         card.className = 'item-card';
         card.innerHTML = `
           <div class="item-top">
+            <span class="item-title">#${h.id} ${escapeHtml(h.statement)}</span>
             <span class="status-badge ${h.status}">${h.status}</span>
-            <span style="font-size:0.7rem;color:var(--text-dim)">#${h.id}</span>
           </div>
-          <div class="item-title">${escapeHtml(h.statement)}</div>
-          ${h.evidence ? `<div class="item-evidence">Evidence: ${escapeHtml(h.evidence)}</div>` : ''}
+          ${h.evidence ? `<div class="item-notes">Evidence: ${escapeHtml(h.evidence)}</div>` : ''}
           <div class="item-actions">
-            ${h.status === 'exploring' ? `
-              <button class="btn-xs" style="color:var(--accent-green)" onclick="updateHypo(${h.id}, 'confirmed')">✓ Confirm</button>
-              <button class="btn-xs" style="color:var(--accent-red)" onclick="updateHypo(${h.id}, 'refuted')">✗ Refute</button>
-            ` : ''}
+            <button class="btn btn-secondary btn-xs" onclick="toggleHypoStatus(${h.id}, 'confirmed')">Confirm</button>
+            <button class="btn btn-secondary btn-xs" onclick="toggleHypoStatus(${h.id}, 'refuted')">Refute</button>
           </div>
         `;
         hypoList.appendChild(card);
@@ -342,10 +406,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. Tasks
     const tasks = memoryData.tasks || [];
-    countTasks.textContent = tasks.length;
+    countTasks.textContent = tasks.filter(t => t.status !== 'done').length;
     taskList.innerHTML = '';
     if (tasks.length === 0) {
-      taskList.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">No tasks queued. Add one above.</div>';
+      taskList.innerHTML = `
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/></svg>
+          <h3>No Active Tasks</h3>
+          <p>Add tasks above to organize refactoring or feature implementation milestones.</p>
+        </div>
+      `;
     } else {
       tasks.forEach(t => {
         const card = document.createElement('div');
@@ -355,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="item-top">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
               <input type="checkbox" ${isDone ? 'checked' : ''} onchange="toggleTask(${t.id}, this.checked)">
-              <span class="item-title" style="${isDone ? 'text-decoration:line-through;color:var(--text-dim)' : ''}">${escapeHtml(t.title)}</span>
+              <span class="item-title" style="${isDone ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${escapeHtml(t.title)}</span>
             </label>
             <span class="status-badge ${t.status}">${t.status}</span>
           </div>
@@ -369,16 +439,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const decs = memoryData.decisions || [];
     decisionsList.innerHTML = '';
     if (decs.length === 0) {
-      decisionsList.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">No architectural decisions logged yet.</div>';
+      decisionsList.innerHTML = `
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+          <h3>No Architectural Decisions Recorded</h3>
+          <p>Decisions recorded via <code>lens_manage_memory(action='add_decision')</code> will appear here.</p>
+        </div>
+      `;
     } else {
       decs.forEach(d => {
         const card = document.createElement('div');
         card.className = 'item-card';
         card.innerHTML = `
           <div class="item-top">
-            <span style="font-weight:600;color:var(--accent-cyan);">${escapeHtml(d.title)}</span>
+            <span style="font-weight:700;color:var(--accent-cyan);">${escapeHtml(d.title)}</span>
           </div>
-          <div style="font-size:0.8rem;color:var(--text-main);margin-top:4px;">${escapeHtml(d.rationale)}</div>
+          <div style="font-size:0.8rem;color:var(--text-primary);margin-top:4px;">${escapeHtml(d.rationale)}</div>
           ${d.tradeoffs ? `<div class="item-notes">Trade-offs: ${escapeHtml(d.tradeoffs)}</div>` : ''}
         `;
         decisionsList.appendChild(card);
@@ -393,13 +469,78 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- Graph Physics & Rendering Engine ---
+  // --------------------------------------------------------------------------
+  // Server-Sent Events (Live SSE Stream)
+  // --------------------------------------------------------------------------
+
+  function initSSE() {
+    try {
+      const evtSource = new EventSource('/api/events');
+      evtSource.onopen = () => {
+        connStatus.textContent = 'SYNCED (LIVE SSE)';
+        connBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+      };
+
+      evtSource.addEventListener('memory_update', () => {
+        fetchMemory();
+        fetchStatus();
+      });
+
+      evtSource.addEventListener('scan_complete', () => {
+        fetchStatus();
+        fetchGraph();
+        fetchRadar();
+        showToast("AST re-scan completed!");
+      });
+
+      evtSource.addEventListener('file_change', (e) => {
+        const d = JSON.parse(e.data);
+        activities.push(d);
+        renderActivity();
+      });
+
+      evtSource.addEventListener('ports_update', () => {
+        fetchPorts();
+      });
+
+      evtSource.onerror = () => {
+        connStatus.textContent = 'DISCONNECTED';
+        connBadge.style.borderColor = 'rgba(244, 63, 94, 0.4)';
+      };
+    } catch (e) {
+      console.warn("SSE not available");
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Code Graph Physics, Canvas Rendering, & Selection Drawer
+  // --------------------------------------------------------------------------
+
+  let width = 800;
+  let height = 600;
+  let transform = { x: 0, y: 0, k: 0.9 };
+  let isDragging = false;
+  let dragStart = { x: 0, y: 0 };
+  let draggedNode = null;
+  let hoveredNode = null;
+
+  function resizeCanvas() {
+    const parent = canvas.parentElement;
+    if (parent) {
+      width = parent.clientWidth;
+      height = parent.clientHeight;
+      canvas.width = width * window.devicePixelRatio;
+      canvas.height = height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
 
   function initGraph(data) {
     const nodeMap = new Map();
-    const count = data.nodes.length;
     const nodes = data.nodes.map((n, i) => {
-      // Golden spiral initial dispersion
       const angle = i * 2.39996;
       const dist = 70 + Math.sqrt(i) * 55;
       const node = {
@@ -420,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
     })).filter(l => typeof l.source === 'object' && typeof l.target === 'object');
 
     graphData = { nodes, links };
-    transform = { x: 0, y: 0, k: 0.9 };
+    transform = { x: 0, y: 0, k: 0.85 };
   }
 
   function simulatePhysics() {
@@ -436,7 +577,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const distSq = dx * dx + dy * dy || 1;
         const dist = Math.sqrt(distSq);
 
-        // Hard collision avoidance buffer
         const minDist = nodes[i].radius + nodes[j].radius + 36;
         if (dist < minDist) {
           const overlap = (minDist - dist) * 0.35;
@@ -448,8 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
           nodes[j].vy += ny * overlap;
         }
 
-        // Long-range electrostatic repulsion
-        if (dist < 400) {
+        if (dist < 420) {
           const repForce = 2200 / (distSq + 200);
           const fx = (dx / dist) * repForce;
           const fy = (dy / dist) * repForce;
@@ -494,96 +633,125 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.save();
     ctx.clearRect(0, 0, width, height);
 
-    // Subtle space grid dots for Mission Control aesthetic
+    // Subtle space grid dots
     ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
     const gridStep = 40;
     for (let gx = 0; gx < width; gx += gridStep) {
       for (let gy = 0; gy < height; gy += gridStep) {
-        ctx.fillRect(gx, gy, 1, 1);
+        ctx.fillRect(gx, gy, 1.5, 1.5);
       }
     }
 
+    // Apply viewport zoom & pan transform
     ctx.translate(transform.x, transform.y);
     ctx.scale(transform.k, transform.k);
 
-    // Links
-    for (const l of graphData.links) {
-      const isHigh = highlightedNodes.has(l.source.id) && highlightedNodes.has(l.target.id);
+    const nodes = graphData.nodes;
+    const links = graphData.links;
+
+    // Filter nodes by active language if set
+    const isVisible = (n) => {
+      if (activeLanguageFilter === 'all') return true;
+      if (activeLanguageFilter === 'python') return n.language === 'python';
+      if (activeLanguageFilter === 'javascript') return n.language === 'javascript' || n.language === 'typescript';
+      if (activeLanguageFilter === 'other') return n.language !== 'python' && n.language !== 'javascript';
+      return true;
+    };
+
+    // Draw Links
+    ctx.lineWidth = 1;
+    for (const l of links) {
+      if (!isVisible(l.source) || !isVisible(l.target)) continue;
+      const isConnectedToSelected = selectedNode && (l.source === selectedNode || l.target === selectedNode);
+      if (isConnectedToSelected) {
+        ctx.strokeStyle = 'rgba(0, 242, 254, 0.7)';
+        ctx.lineWidth = 2;
+      } else {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+        ctx.lineWidth = 1;
+      }
       ctx.beginPath();
       ctx.moveTo(l.source.x, l.source.y);
       ctx.lineTo(l.target.x, l.target.y);
-      ctx.strokeStyle = isHigh ? 'rgba(239, 68, 68, 0.85)' : 'rgba(79, 172, 254, 0.22)';
-      ctx.lineWidth = isHigh ? 2 : 1;
       ctx.stroke();
     }
 
-    // Nodes
-    for (const n of graphData.nodes) {
-      const isSelected = selectedNode && selectedNode.id === n.id;
-      const isHighlighted = highlightedNodes.has(n.id);
+    // Draw Nodes
+    for (const n of nodes) {
+      if (!isVisible(n)) continue;
+      const isSelected = n === selectedNode;
+      const isHovered = n === hoveredNode;
 
-      let color = '#10b981'; // green / low blast
-      if (n.dependents_count >= 4) color = '#ef4444'; // red / high blast
-      else if (n.dependents_count >= 1) color = '#f59e0b'; // amber / medium
-
-      if (isHighlighted) color = '#ef4444';
-
-      // Outer glow ring on selected / high blast
-      if (isSelected || isHighlighted || n.dependents_count >= 4) {
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, n.radius + 4, 0, 2 * Math.PI);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 10;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
+      // Color coding by blast risk
+      let fillCol = '#10b981';
+      let glowCol = 'rgba(16, 185, 129, 0.4)';
+      if (n.risk === 'HIGH' || n.dependents_count >= 8) {
+        fillCol = '#f43f5e';
+        glowCol = 'rgba(244, 63, 94, 0.4)';
+      } else if (n.risk === 'MEDIUM' || n.dependents_count >= 3) {
+        fillCol = '#f59e0b';
+        glowCol = 'rgba(245, 158, 11, 0.4)';
       }
 
-      // Core node circle
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.radius, 0, 2 * Math.PI);
-      ctx.fillStyle = color;
-      ctx.fill();
+      // Outer glow for selected or hovered nodes
+      if (isSelected || isHovered) {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.radius + 6, 0, Math.PI * 2);
+        ctx.fillStyle = glowCol;
+        ctx.fill();
+      }
 
-      ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.3)';
-      ctx.lineWidth = isSelected ? 2 : 1;
+      // Main node body
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+      ctx.fillStyle = isSelected ? '#00f2fe' : fillCol;
+      ctx.fill();
+      ctx.strokeStyle = '#090c12';
+      ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Clean, high-contrast label with dark backdrop stroke
-      ctx.font = '10px "Fira Code", monospace';
+      // Node label with dark outline stroke for legibility
+      const label = n.label || n.id.split('/').pop();
+      ctx.font = '500 10px "Fira Code", monospace';
       ctx.textAlign = 'center';
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#090c12';
-      ctx.strokeText(n.name, n.x, n.y + n.radius + 12);
 
-      ctx.fillStyle = isSelected ? '#00f2fe' : (isHighlighted ? '#fca5a5' : '#cbd5e1');
-      ctx.fillText(n.name, n.x, n.y + n.radius + 12);
+      // Outline stroke behind text
+      ctx.strokeStyle = '#090c12';
+      ctx.lineWidth = 3.5;
+      ctx.strokeText(label, n.x, n.y + n.radius + 12);
+
+      // Text fill
+      ctx.fillStyle = isSelected ? '#00f2fe' : '#e2e8f0';
+      ctx.fillText(label, n.x, n.y + n.radius + 12);
     }
 
     ctx.restore();
   }
 
-  function animationLoop() {
+  function tick() {
     simulatePhysics();
     renderGraph();
-    requestAnimationFrame(animationLoop);
+    requestAnimationFrame(tick);
   }
-  animationLoop();
+  requestAnimationFrame(tick);
 
-  // --- Graph Interactions ---
-
-  function screenToWorld(sx, sy) {
+  // Mouse & Touch Interactions on Canvas
+  function getCanvasCoords(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
     return {
-      x: (sx - transform.x) / transform.k,
-      y: (sy - transform.y) / transform.k,
+      x: (clientX - rect.left - transform.x) / transform.k,
+      y: (clientY - rect.top - transform.y) / transform.k,
     };
   }
 
-  function findNodeAt(wx, wy) {
-    for (const n of graphData.nodes) {
-      const dx = n.x - wx;
-      const dy = n.y - wy;
+  function getNodeAtCoords(coords) {
+    const nodes = graphData.nodes;
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const n = nodes[i];
+      const dx = coords.x - n.x;
+      const dy = coords.y - n.y;
       if (dx * dx + dy * dy <= (n.radius + 4) * (n.radius + 4)) {
         return n;
       }
@@ -592,205 +760,349 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   canvas.addEventListener('mousedown', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    const world = screenToWorld(sx, sy);
-    const hit = findNodeAt(world.x, world.y);
-
+    const coords = getCanvasCoords(e);
+    const hit = getNodeAtCoords(coords);
     if (hit) {
       draggedNode = hit;
-      selectNode(hit);
+      selectedNode = hit;
+      inspectNode(hit);
     } else {
-      isDraggingCanvas = true;
-      dragStart = { x: sx - transform.x, y: sy - transform.y };
+      isDragging = true;
+      dragStart = { x: e.clientX - transform.x, y: e.clientY - transform.y };
     }
   });
 
   window.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-
     if (draggedNode) {
-      const world = screenToWorld(sx, sy);
-      draggedNode.x = world.x;
-      draggedNode.y = world.y;
-    } else if (isDraggingCanvas) {
-      transform.x = sx - dragStart.x;
-      transform.y = sy - dragStart.y;
+      const coords = getCanvasCoords(e);
+      draggedNode.x = coords.x;
+      draggedNode.y = coords.y;
+      draggedNode.vx = 0;
+      draggedNode.vy = 0;
+    } else if (isDragging) {
+      transform.x = e.clientX - dragStart.x;
+      transform.y = e.clientY - dragStart.y;
+    } else {
+      const coords = getCanvasCoords(e);
+      hoveredNode = getNodeAtCoords(coords);
     }
   });
 
   window.addEventListener('mouseup', () => {
     draggedNode = null;
-    isDraggingCanvas = false;
+    isDragging = false;
   });
 
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    const zoom = e.deltaY < 0 ? 1.1 : 0.9;
-
-    const newK = Math.max(0.3, Math.min(3, transform.k * zoom));
-    transform.x = sx - (sx - transform.x) * (newK / transform.k);
-    transform.y = sy - (sy - transform.y) * (newK / transform.k);
-    transform.k = newK;
+    const factor = e.deltaY < 0 ? 1.08 : 0.92;
+    transform.k = Math.max(0.2, Math.min(3.0, transform.k * factor));
   }, { passive: false });
 
+  // Floating Graph Controls
+  zoomInBtn.addEventListener('click', () => {
+    transform.k = Math.min(3.0, transform.k * 1.2);
+  });
+  zoomOutBtn.addEventListener('click', () => {
+    transform.k = Math.max(0.2, transform.k / 1.2);
+  });
   resetZoomBtn.addEventListener('click', () => {
-    transform = { x: 0, y: 0, k: 1 };
+    transform = { x: 0, y: 0, k: 0.85 };
   });
 
+  // Language Filter Chips
+  chipFilters.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chipFilters.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      activeLanguageFilter = chip.getAttribute('data-lang');
+    });
+  });
+
+  // Graph Search Highlight
   graphSearchInput.addEventListener('input', (e) => {
-    const term = e.target.value.trim().toLowerCase();
-    if (!term) {
-      highlightedNodes.clear();
+    const q = e.target.value.trim().toLowerCase();
+    if (!q) {
+      selectedNode = null;
       return;
     }
-    const match = graphData.nodes.find(n => n.name.toLowerCase().includes(term) || n.id.toLowerCase().includes(term));
+    const match = graphData.nodes.find(n => n.id.toLowerCase().includes(q) || (n.label && n.label.toLowerCase().includes(q)));
     if (match) {
-      selectNode(match);
+      selectedNode = match;
+      inspectNode(match);
       transform.x = (width / 2) - match.x * transform.k;
       transform.y = (height / 2) - match.y * transform.k;
     }
   });
 
-  async function selectNode(node) {
-    selectedNode = node;
-    inspectTitle.textContent = node.name;
-    inspectKind.textContent = "FILE";
-    inspectFile.textContent = node.id;
-    inspectLines.textContent = `${node.lines} lines`;
-    inspectSig.textContent = `// File: ${node.id} (${node.symbols_count} symbols, ${node.dependents_count} dependents)`;
-    inspectDoc.textContent = `Language: ${node.language}`;
+  // Symbol Drawer Details
+  async function inspectNode(node) {
+    symbolDrawer.classList.remove('hidden');
+    inspectTitle.textContent = node.label || node.id;
+    inspectFile.textContent = node.file || node.id;
+    inspectKind.textContent = (node.kind || 'MODULE').toUpperCase();
+
+    const risk = node.risk || (node.dependents_count >= 8 ? 'HIGH' : node.dependents_count >= 3 ? 'MODERATE' : 'LOW');
+    inspectRisk.textContent = `RISK: ${risk}`;
+    inspectRisk.className = `risk-pill ${risk.toLowerCase()}`;
+    inspectBlastCount.textContent = `${node.dependents_count || 0} downstream callers`;
 
     try {
-      const res = await fetch(`/api/blast?file=${encodeURIComponent(node.id)}`);
-      const blast = await res.json();
-      inspectRisk.textContent = `RISK: ${blast.risk_level}`;
-      inspectRisk.className = `risk-pill ${blast.risk_level}`;
-      inspectBlastCount.textContent = `${blast.impacted_files.length} downstream files, ${blast.related_tests.length} test suites`;
-      highlightedNodes = new Set([node.id, ...blast.impacted_files]);
+      const sym = node.label || node.id.split('/').pop().replace(/\.[^/.]+$/, "");
+      const res = await fetch(`/api/card?symbol=${encodeURIComponent(sym)}&file=${encodeURIComponent(node.file || node.id)}`);
+      if (res.ok) {
+        const card = await res.json();
+        inspectSig.textContent = card.signature || '// No signature available';
+        inspectLines.textContent = `${card.line_start} - ${card.line_end} (${card.line_count} LOC)`;
+        inspectDoc.textContent = card.docstring || 'No docstring provided';
+      } else {
+        inspectSig.textContent = `// File: ${node.file || node.id}`;
+        inspectLines.textContent = `${node.lines || '--'} LOC`;
+        inspectDoc.textContent = 'Module level definition';
+      }
     } catch (e) {
-      console.error("Blast query error", e);
+      inspectSig.textContent = '// Unable to fetch symbol card';
     }
   }
 
-  // --- Hallucination Guard UI ---
-  runGuardBtn.addEventListener('click', async () => {
-    const file = guardFileInput.value.trim();
-    if (!file) {
-      showToast("Please enter a file to check.");
-      return;
+  closeDrawerBtn.addEventListener('click', () => {
+    symbolDrawer.classList.add('hidden');
+    selectedNode = null;
+  });
+
+  // Quick Action Triggers from Drawer
+  actionSimBlast.addEventListener('click', () => {
+    if (selectedNode) {
+      switchView('view-blast');
+      blastFileInput.value = selectedNode.file || selectedNode.id;
+      blastSymbolInput.value = selectedNode.label || '';
+      runBlastBtn.click();
     }
-    guardResultsList.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">Auditing AST for hallucinations...</div>';
-    try {
-      const res = await fetch('/api/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file }),
-      });
-      const data = await res.json();
-      guardResultsList.innerHTML = '';
+  });
 
-      if (data.valid) {
-        guardResultsList.innerHTML = `<div class="item-card"><span style="color:var(--accent-green);font-size:0.85rem;font-weight:600;">✓ Clean: 0 hallucinated calls or invalid imports found in ${escapeHtml(file)}.</span></div>`;
-      } else {
-        const topBanner = document.createElement('div');
-        topBanner.className = 'item-card';
-        topBanner.innerHTML = `<span style="color:var(--accent-red);font-weight:600;">✗ ${data.hallucination_count} potential hallucination(s) detected:</span>`;
-        guardResultsList.appendChild(topBanner);
+  actionPackContext.addEventListener('click', () => {
+    if (selectedNode) {
+      switchView('view-packer');
+      packerQuery.value = selectedNode.label || selectedNode.id;
+      packBtn.click();
+    }
+  });
 
-        data.hallucinations.forEach(h => {
-          const card = document.createElement('div');
-          card.className = 'item-card';
-          card.innerHTML = `
-            <div class="item-top">
-              <span class="status-badge refuted">Line ${h.line}</span>
-              <span style="font-size:0.75rem;font-family:var(--font-code);color:var(--accent-amber);">${escapeHtml(h.symbol)}</span>
-            </div>
-            <div style="font-size:0.8rem;color:var(--text-main);margin-top:4px;">${escapeHtml(h.message)}</div>
-            ${h.suggested ? `<div class="item-notes">Recommended Fix: <strong>${escapeHtml(h.suggested)}</strong></div>` : ''}
-          `;
-          guardResultsList.appendChild(card);
+  actionAuditRisk.addEventListener('click', () => {
+    if (selectedNode) {
+      switchView('view-dynamic-risk');
+      dynamicRiskSymbolInput.value = selectedNode.label || selectedNode.id;
+      runDynamicRiskBtn.click();
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // Global Command Palette (Ctrl+K)
+  // --------------------------------------------------------------------------
+
+  function openCommandPalette() {
+    buildCmdItems();
+    cmdModal.showModal();
+    cmdInput.value = '';
+    renderCmdResults('');
+    cmdInput.focus();
+  }
+
+  function closeCommandPalette() {
+    cmdModal.close();
+  }
+
+  cmdPaletteTrigger.addEventListener('click', openCommandPalette);
+  closeCmdBtn.addEventListener('click', closeCommandPalette);
+
+  cmdModal.addEventListener('click', (e) => {
+    const rect = cmdModal.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+      closeCommandPalette();
+    }
+  });
+
+  function buildCmdItems() {
+    cmdItems = [
+      { type: 'view', title: 'Open Code Graph', icon: '🗺️', view: 'view-graph', category: 'Navigation' },
+      { type: 'view', title: 'Open PageRank RepoMap', icon: '📑', view: 'view-repomap', category: 'Navigation' },
+      { type: 'view', title: 'Open Context Slicer', icon: '✂️', view: 'view-packer', category: 'Navigation' },
+      { type: 'view', title: 'Open Blast Radius Simulator', icon: '🎯', view: 'view-blast', category: 'Navigation' },
+      { type: 'view', title: 'Open Dynamic Risk Auditor', icon: '⚡', view: 'view-dynamic-risk', category: 'Navigation' },
+      { type: 'view', title: 'Open Hallucination Guard', icon: '🛡️', view: 'view-guard', category: 'Navigation' },
+      { type: 'view', title: 'Open Ghost Patch Dry-Run', icon: '👻', view: 'view-ghost', category: 'Navigation' },
+      { type: 'view', title: 'Open Port Sentinel', icon: '🔌', view: 'view-sentinel', category: 'Navigation' },
+      { type: 'view', title: 'Open Hypotheses Ledger', icon: '💡', view: 'view-hypo', category: 'Navigation' },
+      { type: 'view', title: 'Open Task Checklist', icon: '✅', view: 'view-tasks', category: 'Navigation' },
+      { type: 'view', title: 'Open Scratchpad', icon: '📝', view: 'view-scratchpad', category: 'Navigation' },
+      { type: 'action', title: 'Trigger AST Re-Scan', icon: '🔄', action: () => rescanBtn.click(), category: 'Action' },
+      { type: 'action', title: 'Copy Agent Recovery Briefing', icon: '📋', action: () => copyBriefBtn.click(), category: 'Action' },
+      { type: 'action', title: 'Generate PageRank RepoMap', icon: '⚡', action: () => { switchView('view-repomap'); genRepoMapBtn.click(); }, category: 'Action' },
+    ];
+
+    // Add symbols from graph
+    if (graphData.nodes) {
+      graphData.nodes.slice(0, 50).forEach(n => {
+        cmdItems.push({
+          type: 'symbol',
+          title: n.label || n.id,
+          icon: 'ƒ',
+          node: n,
+          category: 'Symbol',
         });
-      }
-    } catch (e) {
-      guardResultsList.innerHTML = '<div style="color:var(--accent-red);padding:12px;">Verification failed.</div>';
+      });
     }
-  });
+  }
 
-  // --- Refactor Planner UI ---
-  runPlanBtn.addEventListener('click', async () => {
-    const file = planFileInput.value.trim();
-    const symbol = planSymbolInput.value.trim() || null;
-    const objective = planObjInput.value.trim() || "Refactor";
-    if (!file) {
-      showToast("Target file is required.");
+  function renderCmdResults(query) {
+    const q = query.toLowerCase();
+    const filtered = cmdItems.filter(item => item.title.toLowerCase().includes(q) || item.category.toLowerCase().includes(q));
+    cmdResultsList.innerHTML = '';
+    activeCmdIndex = 0;
+
+    if (filtered.length === 0) {
+      cmdResultsList.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:0.8rem;text-align:center;">No matching symbols or commands.</div>';
       return;
     }
 
-    planResultsList.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:12px;">Generating topologically sorted DAG plan...</div>';
-    try {
-      const res = await fetch('/api/plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file, symbol, objective }),
-      });
-      const plan = await res.json();
-      planResultsList.innerHTML = '';
-
-      const header = document.createElement('div');
-      header.className = 'item-card';
-      header.innerHTML = `
-        <div class="item-top">
-          <span style="font-weight:600;color:var(--accent-cyan);">${escapeHtml(plan.objective)}</span>
-          <span class="risk-pill ${plan.risk_level}">RISK: ${plan.risk_level}</span>
-        </div>
-        <div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">${plan.total_steps} sequential execution steps generated.</div>
+    filtered.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = `cmd-item ${idx === 0 ? 'selected' : ''}`;
+      row.innerHTML = `
+        <span style="font-family:var(--font-mono);color:var(--accent-cyan);">${item.icon}</span>
+        <span>${escapeHtml(item.title)}</span>
+        <span class="cmd-item-category">${item.category}</span>
       `;
-      planResultsList.appendChild(header);
-
-      plan.execution_steps.forEach(s => {
-        const card = document.createElement('div');
-        card.className = 'item-card';
-        card.innerHTML = `
-          <div class="item-top">
-            <span class="action-badge ${s.action}">STEP ${s.step_number}: ${s.action}</span>
-            <span style="font-size:0.75rem;color:var(--text-dim)">${escapeHtml(s.file)}</span>
-          </div>
-          <div style="font-size:0.8rem;color:var(--text-main);margin:4px 0;">${escapeHtml(s.description)}</div>
-          <div class="item-notes">Verify: <code>${escapeHtml(s.preflight_cmd)}</code></div>
-        `;
-        planResultsList.appendChild(card);
+      row.addEventListener('click', () => {
+        executeCmdItem(item);
       });
-    } catch (e) {
-      planResultsList.innerHTML = '<div style="color:var(--accent-red);padding:12px;">Plan generation failed.</div>';
+      cmdResultsList.appendChild(row);
+    });
+  }
+
+  function executeCmdItem(item) {
+    closeCommandPalette();
+    if (item.type === 'view') {
+      switchView(item.view);
+    } else if (item.type === 'action') {
+      item.action();
+    } else if (item.type === 'symbol') {
+      switchView('view-graph');
+      selectedNode = item.node;
+      inspectNode(item.node);
+      transform.x = (width / 2) - item.node.x * transform.k;
+      transform.y = (height / 2) - item.node.y * transform.k;
+    }
+  }
+
+  cmdInput.addEventListener('input', (e) => {
+    renderCmdResults(e.target.value);
+  });
+
+  cmdInput.addEventListener('keydown', (e) => {
+    const items = cmdResultsList.querySelectorAll('.cmd-item');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeCmdIndex = Math.min(items.length - 1, activeCmdIndex + 1);
+      updateCmdSelection(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeCmdIndex = Math.max(0, activeCmdIndex - 1);
+      updateCmdSelection(items);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = cmdInput.value.toLowerCase();
+      const filtered = cmdItems.filter(item => item.title.toLowerCase().includes(q) || item.category.toLowerCase().includes(q));
+      if (filtered[activeCmdIndex]) {
+        executeCmdItem(filtered[activeCmdIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      closeCommandPalette();
     }
   });
 
-  // --- Context Packer ---
-  packBtn.addEventListener('click', async () => {
-    const query = packerQuery.value.trim();
-    const budget = parseInt(packerBudget.value, 10) || 1200;
-    if (!query) return;
+  function updateCmdSelection(items) {
+    items.forEach((it, idx) => {
+      if (idx === activeCmdIndex) {
+        it.classList.add('selected');
+        it.scrollIntoView({ block: 'nearest' });
+      } else {
+        it.classList.remove('selected');
+      }
+    });
+  }
 
-    packStats.textContent = 'Slicing AST...';
+  // Global Keyboard Shortcuts
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openCommandPalette();
+    } else if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+      e.preventDefault();
+      helpModal.showModal();
+    } else if (e.key.toLowerCase() === 'r' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+      rescanBtn.click();
+    } else if (e.key.toLowerCase() === 'b' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+      copyBriefBtn.click();
+    }
+  });
+
+  helpModalBtn.addEventListener('click', () => helpModal.showModal());
+  closeHelpBtn.addEventListener('click', () => helpModal.close());
+  helpModal.addEventListener('click', (e) => {
+    const rect = helpModal.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+      helpModal.close();
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // Tool View Actions
+  // --------------------------------------------------------------------------
+
+  // 1. RepoMap
+  genRepoMapBtn.addEventListener('click', async () => {
+    const budget = parseInt(repoMapBudgetInput.value, 10) || 1024;
+    repoMapStats.textContent = 'Computing PageRank & symbol tree...';
+    try {
+      const res = await fetch(`/api/repomap?budget=${budget}`);
+      const data = await res.json();
+      repoMapResult.value = data.map_content;
+      repoMapStats.textContent = `RepoMap: ${data.files_included}/${data.total_files} files, ${data.symbols_included} symbols (~${data.estimated_tokens} tokens)`;
+      showToast("RepoMap Computed!");
+    } catch (e) {
+      repoMapStats.textContent = "Error generating RepoMap.";
+    }
+  });
+
+  copyRepoMapBtn.addEventListener('click', () => {
+    if (repoMapResult.value) {
+      navigator.clipboard.writeText(repoMapResult.value);
+      showToast("RepoMap copied to clipboard!");
+    }
+  });
+
+  // 2. Context Packer
+  packBtn.addEventListener('click', async () => {
+    const q = packerQuery.value.trim();
+    const budget = parseInt(packerBudget.value, 10) || 1200;
+    if (!q) {
+      showToast("Please enter target symbol or module name.");
+      return;
+    }
+    packStats.textContent = "Pruning AST and extracting context slice...";
     try {
       const res = await fetch('/api/pack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, budget }),
+        body: JSON.stringify({ query: q, budget }),
       });
       const data = await res.json();
       packerResult.value = data.slice_content;
-      packStats.textContent = `Sliced: ${data.target_symbol || query} (~${data.estimated_tokens} tokens / Budget: ${budget})`;
-      showToast("AST Slice Generated!");
+      packStats.textContent = `Packed: ${data.lines_returned} lines (~${data.estimated_tokens} tokens) for '${q}'`;
+      showToast("Context slice ready!");
     } catch (e) {
-      packStats.textContent = "Error packing context.";
+      packStats.textContent = "Error slicing context.";
     }
   });
 
@@ -801,16 +1113,171 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // --- Ghost Patch Simulator ---
+  // 3. Blast Radius
+  runBlastBtn.addEventListener('click', async () => {
+    const file = blastFileInput.value.trim();
+    const sym = blastSymbolInput.value.trim();
+    if (!file) {
+      showToast("Please enter a file path.");
+      return;
+    }
+
+    blastResultsList.innerHTML = '<div style="color:var(--text-muted);padding:14px;">Calculating transitive reverse blast radius...</div>';
+    try {
+      const url = `/api/blast?file=${encodeURIComponent(file)}${sym ? `&symbol=${encodeURIComponent(sym)}` : ''}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      blastResultsList.innerHTML = '';
+
+      const summaryCard = document.createElement('div');
+      summaryCard.className = 'item-card';
+      summaryCard.innerHTML = `
+        <div class="item-top">
+          <span style="font-weight:700;color:var(--text-primary);">${escapeHtml(data.target_file)}</span>
+          <span class="risk-pill ${data.risk_level.toLowerCase()}">RISK: ${data.risk_level}</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">
+          Impacts <strong>${data.impacted_files.length}</strong> downstream files, <strong>${data.impacted_symbols.length}</strong> callers, and <strong>${data.related_tests.length}</strong> test suites.
+        </div>
+      `;
+      blastResultsList.appendChild(summaryCard);
+
+      if (data.related_tests.length > 0) {
+        const testCard = document.createElement('div');
+        testCard.className = 'item-card';
+        testCard.innerHTML = `
+          <div class="item-top"><span class="status-badge confirmed">ASSOCIATED TEST SUITES</span></div>
+          <div style="font-size:0.75rem;font-family:var(--font-mono);color:var(--accent-green);margin-top:4px;">
+            ${data.related_tests.map(t => `• ${escapeHtml(t)}`).join('<br>')}
+          </div>
+        `;
+        blastResultsList.appendChild(testCard);
+      }
+
+      if (data.impacted_files.length > 0) {
+        const callerCard = document.createElement('div');
+        callerCard.className = 'item-card';
+        callerCard.innerHTML = `
+          <div class="item-top"><span class="status-badge exploring">IMPACTED DOWNSTREAM FILES</span></div>
+          <div style="font-size:0.75rem;font-family:var(--font-mono);color:var(--text-secondary);margin-top:4px;">
+            ${data.impacted_files.map(f => `• ${escapeHtml(f)}`).join('<br>')}
+          </div>
+        `;
+        blastResultsList.appendChild(callerCard);
+      }
+    } catch (e) {
+      blastResultsList.innerHTML = '<div style="color:var(--accent-rose);padding:14px;">Error calculating blast radius.</div>';
+    }
+  });
+
+  // 4. Dynamic Risk
+  window.setAndAuditRisk = (symbol) => {
+    dynamicRiskSymbolInput.value = symbol;
+    runDynamicRiskBtn.click();
+  };
+
+  runDynamicRiskBtn.addEventListener('click', async () => {
+    const symbol = dynamicRiskSymbolInput.value.trim();
+    if (!symbol) return;
+    dynamicRiskResultsList.innerHTML = '<div style="color:var(--text-muted);padding:14px;">Auditing symbol across AST & dynamic references...</div>';
+    try {
+      const res = await fetch(`/api/dynamic-risk?symbol=${encodeURIComponent(symbol)}`);
+      const data = await res.json();
+      dynamicRiskResultsList.innerHTML = '';
+
+      const summaryCard = document.createElement('div');
+      summaryCard.className = 'item-card';
+      summaryCard.innerHTML = `
+        <div class="item-top">
+          <span style="font-weight:700;font-family:var(--font-mono);color:var(--accent-cyan);">${escapeHtml(symbol)}</span>
+          <span class="risk-pill ${data.dynamic_risk_level.toLowerCase()}">DYNAMIC RISK: ${data.dynamic_risk_level}</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">
+          Detected <strong>${data.total_unverified_references}</strong> unverified dynamic references (reflection, registry lookups, duck typing).
+        </div>
+      `;
+      dynamicRiskResultsList.appendChild(summaryCard);
+
+      if (data.findings && data.findings.length > 0) {
+        data.findings.forEach(f => {
+          const card = document.createElement('div');
+          card.className = 'item-card';
+          card.innerHTML = `
+            <div class="item-top">
+              <span class="status-badge ${f.severity === 'HIGH' ? 'refuted' : 'pending'}">${f.severity}</span>
+              <span style="font-size:0.75rem;font-family:var(--font-mono);color:var(--text-muted);">${escapeHtml(f.file)}:${f.line}</span>
+            </div>
+            <div style="font-size:0.8rem;color:var(--text-primary);margin:4px 0;">${escapeHtml(f.detail)}</div>
+            ${f.snippet ? `<div class="item-notes"><code>${escapeHtml(f.snippet)}</code></div>` : ''}
+          `;
+          dynamicRiskResultsList.appendChild(card);
+        });
+      } else {
+        const cleanCard = document.createElement('div');
+        cleanCard.className = 'item-card';
+        cleanCard.innerHTML = '<span style="color:var(--accent-green);font-size:0.8rem;">✓ No unverified dynamic reflection or duck typing detected for this symbol.</span>';
+        dynamicRiskResultsList.appendChild(cleanCard);
+      }
+    } catch (e) {
+      dynamicRiskResultsList.innerHTML = '<div style="color:var(--accent-rose);padding:14px;">Dynamic risk audit failed.</div>';
+    }
+  });
+
+  // 5. Hallucination Guard
+  runGuardBtn.addEventListener('click', async () => {
+    const file = guardFileInput.value.trim();
+    if (!file) return;
+    guardResultsList.innerHTML = '<div style="color:var(--text-muted);padding:14px;">Cross-checking imports against workspace exports and stdlib...</div>';
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file }),
+      });
+      const data = await res.json();
+      guardResultsList.innerHTML = '';
+
+      const summaryCard = document.createElement('div');
+      summaryCard.className = 'item-card';
+      summaryCard.innerHTML = `
+        <div class="item-top">
+          <span style="font-weight:700;font-family:var(--font-mono);color:var(--text-primary);">${escapeHtml(data.file)}</span>
+          <span class="status-badge ${data.is_clean ? 'confirmed' : 'refuted'}">${data.is_clean ? 'CLEAN' : 'FLAGGED'}</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">
+          ${data.is_clean ? 'All imported modules and methods exist in the project or stdlib.' : `Found ${data.flagged_count} phantom imports or nonexistent symbols.`}
+        </div>
+      `;
+      guardResultsList.appendChild(summaryCard);
+
+      if (data.hallucinations && data.hallucinations.length > 0) {
+        data.hallucinations.forEach(h => {
+          const card = document.createElement('div');
+          card.className = 'item-card';
+          card.innerHTML = `
+            <div class="item-top"><span class="status-badge refuted">UNRESOLVED IMPORT</span></div>
+            <div style="font-size:0.8rem;color:var(--accent-rose);font-family:var(--font-mono);">${escapeHtml(h.symbol)}</div>
+            ${h.suggested_match ? `<div class="item-notes">Nearest match suggestion: <strong>${escapeHtml(h.suggested_match)}</strong></div>` : ''}
+          `;
+          guardResultsList.appendChild(card);
+        });
+      }
+    } catch (e) {
+      guardResultsList.innerHTML = '<div style="color:var(--accent-rose);padding:14px;">File verification failed.</div>';
+    }
+  });
+
+  // 6. Ghost Patch Dry-Run
   ghostTestBtn.addEventListener('click', async () => {
     const file = ghostFile.value.trim();
     const content = ghostContent.value;
     if (!file || !content) {
-      showToast("Please enter file path and proposed code.");
+      showToast("Please enter file path and proposed patch.");
       return;
     }
 
     ghostVerdict.textContent = 'Simulating dry-run in shadow AST...';
+    ghostVerdict.className = 'verdict-banner waiting';
     try {
       const res = await fetch('/api/ghost-patch', {
         method: 'POST',
@@ -819,89 +1286,78 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await res.json();
       ghostVerdict.className = `verdict-banner ${data.verdict}`;
-      let text = `Verdict: [${data.verdict}] (Safety: ${data.safety_score}/100)`;
+      ghostVerdict.textContent = `Verdict: [${data.verdict}] (Safety Score: ${data.safety_score}/100)`;
+
+      let detailsHtml = '';
       if (data.breakages && data.breakages.length > 0) {
-        text += `\n${data.breakages.join('\n')}`;
+        detailsHtml += `<div style="color:var(--accent-rose);margin-top:8px;"><strong>Breakages:</strong><br>${data.breakages.map(b => `• ${escapeHtml(b)}`).join('<br>')}</div>`;
       }
       if (data.warnings && data.warnings.length > 0) {
-        text += `\n${data.warnings.join('\n')}`;
+        detailsHtml += `<div style="color:var(--accent-amber);margin-top:8px;"><strong>Warnings:</strong><br>${data.warnings.map(w => `• ${escapeHtml(w)}`).join('<br>')}</div>`;
       }
-      ghostVerdict.textContent = text;
+      if (data.caveats && data.caveats.length > 0) {
+        detailsHtml += `<div style="color:var(--text-muted);font-size:0.75rem;margin-top:8px;"><strong>Caveats:</strong><br>${data.caveats.map(c => `• ${escapeHtml(c)}`).join('<br>')}</div>`;
+      }
+      ghostVerdictDetails.innerHTML = detailsHtml || '<p class="muted-note">No caller breakages detected in static AST analysis.</p>';
       showToast(`Ghost Patch: ${data.verdict}`);
     } catch (e) {
       ghostVerdict.textContent = "Error testing patch.";
     }
   });
 
-  // --- RepoMap ---
-  if (genRepoMapBtn) {
-    genRepoMapBtn.addEventListener('click', async () => {
-      const budget = parseInt(repoMapBudgetInput.value, 10) || 1024;
-      repoMapStats.textContent = 'Computing PageRank & symbol tree...';
-      try {
-        const res = await fetch(`/api/repomap?budget=${budget}`);
-        const data = await res.json();
-        repoMapResult.value = data.map_content;
-        repoMapStats.textContent = `RepoMap: ${data.files_included}/${data.total_files} files, ${data.symbols_included} symbols (~${data.estimated_tokens} tokens)`;
-        showToast("RepoMap Generated!");
-      } catch (e) {
-        repoMapStats.textContent = "Error generating RepoMap.";
+  // 7. Refactor Planner
+  runPlanBtn.addEventListener('click', async () => {
+    const file = planFileInput.value.trim();
+    const sym = planSymbolInput.value.trim();
+    const obj = planObjInput.value.trim();
+    if (!file) return;
+
+    planResultsList.innerHTML = '<div style="color:var(--text-muted);padding:14px;">Generating topologically sorted refactoring DAG plan...</div>';
+    try {
+      const res = await fetch('/api/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file, symbol: sym, objective: obj }),
+      });
+      const data = await res.json();
+      planResultsList.innerHTML = '';
+
+      const summaryCard = document.createElement('div');
+      summaryCard.className = 'item-card';
+      summaryCard.innerHTML = `
+        <div class="item-top">
+          <span style="font-weight:700;color:var(--accent-cyan);">${escapeHtml(data.objective || 'Refactor Plan')}</span>
+          <span class="status-badge confirmed">${data.total_steps || data.steps.length} STEPS</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">
+          Target: <code>${escapeHtml(data.target_file)}</code> (${data.target_symbol || 'entire module'})
+        </div>
+      `;
+      planResultsList.appendChild(summaryCard);
+
+      if (data.steps && data.steps.length > 0) {
+        data.steps.forEach((step, idx) => {
+          const card = document.createElement('div');
+          card.className = 'item-card';
+          card.innerHTML = `
+            <div class="item-top">
+              <span class="status-badge exploring">STEP ${idx + 1}: ${step.action}</span>
+              <span style="font-size:0.75rem;font-family:var(--font-mono);color:var(--text-muted);">${escapeHtml(step.file)}</span>
+            </div>
+            <div style="font-size:0.82rem;color:var(--text-primary);margin-top:4px;">${escapeHtml(step.description)}</div>
+          `;
+          planResultsList.appendChild(card);
+        });
       }
-    });
-  }
+    } catch (e) {
+      planResultsList.innerHTML = '<div style="color:var(--accent-rose);padding:14px;">Error generating plan.</div>';
+    }
+  });
 
-  if (copyRepoMapBtn) {
-    copyRepoMapBtn.addEventListener('click', () => {
-      if (repoMapResult.value) {
-        navigator.clipboard.writeText(repoMapResult.value);
-        showToast("RepoMap copied to clipboard!");
-      }
-    });
-  }
-
-  // --- Dynamic Risk ---
-  if (runDynamicRiskBtn) {
-    runDynamicRiskBtn.addEventListener('click', async () => {
-      const symbol = dynamicRiskSymbolInput.value.trim();
-      if (!symbol) return;
-      dynamicRiskResultsList.innerHTML = '<div style="color:var(--text-dim);padding:12px;">Auditing symbol across AST & dynamic references...</div>';
-      try {
-        const res = await fetch(`/api/dynamic-risk?symbol=${encodeURIComponent(symbol)}`);
-        const data = await res.json();
-        dynamicRiskResultsList.innerHTML = '';
-        const header = document.createElement('div');
-        header.style.padding = '8px 12px';
-        header.style.fontSize = '0.85rem';
-        header.innerHTML = `<strong>Dynamic Risk:</strong> <span class="risk-pill ${data.dynamic_risk_level.toLowerCase()}">${data.dynamic_risk_level}</span> (${data.total_unverified_references} unverified dynamic references)`;
-        dynamicRiskResultsList.appendChild(header);
-
-        if (data.findings && data.findings.length > 0) {
-          data.findings.forEach(f => {
-            const card = document.createElement('div');
-            card.className = 'item-card';
-            card.innerHTML = `
-              <div class="item-top">
-                <span class="action-badge ${f.severity === 'HIGH' ? 'CREATE' : 'UPDATE'}">${f.severity}</span>
-                <span style="font-size:0.75rem;color:var(--text-dim)">${escapeHtml(f.file)}:${f.line}</span>
-              </div>
-              <div style="font-size:0.8rem;color:var(--text-main);margin:4px 0;">${escapeHtml(f.detail)}</div>
-              ${f.snippet ? `<div class="item-notes"><code>${escapeHtml(f.snippet)}</code></div>` : ''}
-            `;
-            dynamicRiskResultsList.appendChild(card);
-          });
-        } else {
-          dynamicRiskResultsList.innerHTML += '<div style="color:var(--accent-green);padding:12px;">No unverified dynamic reflection or duck typing detected for this symbol.</div>';
-        }
-      } catch (e) {
-        dynamicRiskResultsList.innerHTML = '<div style="color:var(--accent-red);padding:12px;">Dynamic risk audit failed.</div>';
-      }
-    });
-  }
-
-  // --- Port Sentinel ---
+  // 8. Port Sentinel
   refreshPortsBtn.addEventListener('click', fetchPorts);
   window.killPort = async (port) => {
-    if (!confirm(`Are you sure you want to terminate the process on port ${port}?`)) return;
+    if (!confirm(`Safety Check: Terminate dev server process listening on port ${port}?`)) return;
     try {
       const res = await fetch('/api/ports/kill', {
         method: 'POST',
@@ -909,15 +1365,14 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ port, confirm: true }),
       });
       const data = await res.json();
-      showToast(data.message);
+      showToast(data.message || `Terminated port ${port}`);
       fetchPorts();
     } catch (e) {
       showToast("Failed to kill port.");
     }
   };
 
-  // --- Memory Actions ---
-
+  // 9. Memory Handlers
   addHypoBtn.addEventListener('click', async () => {
     const text = newHypoInput.value.trim();
     if (!text) return;
@@ -929,6 +1384,7 @@ document.addEventListener('DOMContentLoaded', () => {
     newHypoInput.value = '';
     fetchMemory();
     fetchStatus();
+    showToast("Hypothesis added!");
   });
 
   addTaskBtn.addEventListener('click', async () => {
@@ -942,69 +1398,17 @@ document.addEventListener('DOMContentLoaded', () => {
     newTaskInput.value = '';
     fetchMemory();
     fetchStatus();
+    showToast("Task created!");
   });
 
-  saveScratchBtn.addEventListener('click', async () => {
-    const content = scratchpadArea.value;
-    await fetch('/api/memory/scratchpad', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, updated_by: 'human' }),
-    });
-    showToast("Scratchpad saved to memory!");
-  });
-
-  rescanBtn.addEventListener('click', async () => {
-    rescanBtn.disabled = true;
-    rescanBtn.textContent = 'Scanning...';
-    try {
-      await fetch('/api/scan', { method: 'POST' });
-      await fetchStatus();
-      await fetchGraph();
-      await fetchRadar();
-      await fetchActivity();
-      showToast("AST & Cartography re-scanned!");
-    } finally {
-      rescanBtn.disabled = false;
-      rescanBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Re-scan AST';
-    }
-  });
-
-  copyBriefBtn.addEventListener('click', () => {
-    if (memoryData && memoryData.summary) {
-      navigator.clipboard.writeText(memoryData.summary);
-      showToast("Recovery Briefing copied!");
-    }
-  });
-
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      tabBtns.forEach(b => b.classList.remove('active'));
-      tabPanes.forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      const targetPane = document.getElementById(btn.dataset.tab);
-      if (targetPane) targetPane.classList.add('active');
-    });
-  });
-
-  function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
-  function showToast(msg) {
-    toast.textContent = msg;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2500);
-  }
-
-  window.updateHypo = async (id, status) => {
+  window.toggleHypoStatus = async (id, status) => {
     await fetch('/api/memory/hypo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'update', id, status }),
     });
     fetchMemory();
+    fetchStatus();
   };
 
   window.toggleTask = async (id, isDone) => {
@@ -1014,14 +1418,57 @@ document.addEventListener('DOMContentLoaded', () => {
       body: JSON.stringify({ action: 'update', id, status: isDone ? 'done' : 'pending' }),
     });
     fetchMemory();
+    fetchStatus();
   };
 
-  // Initial load
+  saveScratchBtn.addEventListener('click', async () => {
+    const content = scratchpadArea.value;
+    scratchSavedIndicator.textContent = 'Saving...';
+    await fetch('/api/memory/scratchpad', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, updated_by: 'human' }),
+    });
+    scratchSavedIndicator.textContent = 'Synced to SQLite';
+    showToast("Scratchpad saved!");
+  });
+
+  // 10. Header Action Triggers
+  rescanBtn.addEventListener('click', async () => {
+    rescanBtn.disabled = true;
+    rescanBtn.textContent = 'Scanning...';
+    try {
+      await fetch('/api/scan', { method: 'POST' });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      rescanBtn.disabled = false;
+      rescanBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+        Re-scan AST
+      `;
+    }
+  });
+
+  copyBriefBtn.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/memory');
+      const data = await res.json();
+      if (data.compact_summary) {
+        navigator.clipboard.writeText(data.compact_summary);
+        showToast("Recovery Briefing copied to clipboard!");
+      }
+    } catch (e) {
+      showToast("Failed to copy briefing.");
+    }
+  });
+
+  // Initial Boot
   fetchStatus();
-  fetchMemory();
   fetchGraph();
   fetchRadar();
   fetchPorts();
   fetchActivity();
-  connectSSE();
+  fetchMemory();
+  initSSE();
 });
