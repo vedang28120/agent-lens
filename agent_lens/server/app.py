@@ -429,9 +429,11 @@ def start_mission_control_server(port: int = 4141, root_dir: str = "."):
         activity = {
             "file": rel_path,
             "type": event_type,
+            "event_type": event_type,
             "timestamp": time.time(),
         }
         activity_buffer.append(activity)
+        broadcaster.broadcast("file_change", activity)
         broadcaster.broadcast("file_activity", activity)
 
     watcher = CodebaseWatcher(cart, on_change_callback=on_file_event)
