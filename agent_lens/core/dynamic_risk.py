@@ -11,21 +11,40 @@ class DynamicRiskDetector:
     and string-based symbol lookups that defeat static AST analysis in Python.
     """
 
+    COMMON_NOISY_SYMBOLS: Set[str] = {
+        "get", "set", "run", "id", "name", "type", "key", "value", "data", "test",
+        "init", "call", "start", "stop", "handle", "update", "delete", "create"
+    }
+
+    NON_CODE_EXTENSIONS: Set[str] = {
+        ".md", ".json", ".yml", ".yaml", ".toml", ".txt", ".csv", ".log"
+    }
+
     def __init__(self, cartographer: CodebaseCartographer):
         self.cart = cartographer
 
     def audit_symbol_dynamic_risk(self, target_symbol: str, target_file: Optional[str] = None) -> Dict[str, Any]:
         """
         Audits the repository for dynamic occurrences of `target_symbol` that static AST
-        call graphs would otherwise miss.
+        call graphs would otherwise miss, with strict filtering to prevent false positives.
         """
         findings = []
-        target_re = re.compile(rf"\b{re.escape(target_symbol)}\b")
-        string_re = re.compile(rf"['\"][^'\"]*{re.escape(target_symbol)}[^'\"]*['\"]")
+        is_common_name = target_symbol.lower() in self.COMMON_NOISY_SYMBOLS
+        
+        # Match exact string literals 'symbol' or "symbol"
+        exact_string_re = re.compile(rf"['\"]{re.escape(target_symbol)}['\"]")
+        # Match explicit reflection calls
         getattr_re = re.compile(rf"(?:getattr|hasattr|setattr|delattr)\s*\([^,]+,\s*['\"]{re.escape(target_symbol)}['\"]")
+        # Match registry or dynamic dispatch dictionary lookups
+        lookup_re = re.compile(rf"(?:\[\s*['\"]{re.escape(target_symbol)}['\"]\s*\]|\.(?:get|pop|register|dispatch)\s*\(\s*['\"]{re.escape(target_symbol)}['\"])")
 
         for file_path, parse_res in self.cart.file_results.items():
             if target_file and file_path == target_file:
+                continue
+
+            # Skip non-code files (documentation, config, data)
+            _, ext = os.path.splitext(file_path.lower())
+            if ext in self.NON_CODE_EXTENSIONS:
                 continue
 
             full_path = os.path.join(self.cart.root_path, file_path)
@@ -57,21 +76,37 @@ class DynamicRiskDetector:
                     "severity": "HIGH",
                 })
 
-            # 2. String literal references: e.g. "symbol" in dict or callback registration
-            for match in string_re.finditer(content):
-                if getattr_re.search(match.group(0)):
-                    continue
+            # 2. Dynamic Dispatch / Registry Lookup
+            for match in lookup_re.finditer(content):
                 line_no = content[:match.start()].count("\n") + 1
                 snippet = lines[line_no - 1].strip() if line_no <= len(lines) else ""
-                if not snippet.startswith("#") and not snippet.startswith("//"):
+                if not any(f["file"] == file_path and f["line"] == line_no for f in findings):
                     findings.append({
                         "file": file_path,
                         "line": line_no,
-                        "type": "STRING_LITERAL_REFERENCE",
-                        "detail": f"Symbol name referenced as string: {match.group(0)}",
+                        "type": "REGISTRY_DISPATCH_LOOKUP",
+                        "detail": f"Dynamic table/registry lookup via `{match.group(0)}`",
                         "snippet": snippet,
-                        "severity": "MEDIUM",
+                        "severity": "HIGH",
                     })
+
+            # 3. Exact String literal references (suppressed for common words to avoid noise)
+            if not is_common_name:
+                for match in exact_string_re.finditer(content):
+                    if getattr_re.search(match.group(0)) or lookup_re.search(match.group(0)):
+                        continue
+                    line_no = content[:match.start()].count("\n") + 1
+                    snippet = lines[line_no - 1].strip() if line_no <= len(lines) else ""
+                    if not snippet.startswith("#") and not snippet.startswith("//") and not snippet.startswith("*"):
+                        if not any(f["file"] == file_path and f["line"] == line_no for f in findings):
+                            findings.append({
+                                "file": file_path,
+                                "line": line_no,
+                                "type": "STRING_LITERAL_REFERENCE",
+                                "detail": f"Exact symbol name referenced as string literal",
+                                "snippet": snippet,
+                                "severity": "MEDIUM",
+                            })
 
             # 3. Python AST Loose Attribute Access (Duck Typing)
             if parse_res.language == "python":

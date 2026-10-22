@@ -67,6 +67,7 @@ def run_benchmarks():
             "id": "TASK_1",
             "name": "Inspect & patch detect_language in parser.py",
             "file": "agent_lens/core/parser.py",
+            "caller_file": "tests/test_parser.py",
             "symbol": "detect_language",
             "desc": "Agent fixing file extension mappings"
         },
@@ -74,6 +75,7 @@ def run_benchmarks():
             "id": "TASK_2",
             "name": "Audit do_GET route handling in app.py",
             "file": "agent_lens/server/app.py",
+            "caller_file": "agent_lens/cli.py",
             "symbol": "do_GET",
             "desc": "Agent inspecting HTTP routes and security"
         },
@@ -81,44 +83,69 @@ def run_benchmarks():
             "id": "TASK_3",
             "name": "Update calculate_blast_radius in cartography.py",
             "file": "agent_lens/core/cartography.py",
+            "caller_file": "tests/test_cartography.py",
             "symbol": "calculate_blast_radius",
             "desc": "Agent tuning BFS graph traversal logic"
         },
     ]
 
-    total_baseline_tokens = 0
-    total_lens_tokens = 0
+    print("\n  A. Symbol Lookup / Inspection Phase (Card vs. Reading Target File):")
+    print(f"  {'Task':<8} | {'Target Symbol':<25} | {'Whole File Read':<18} | {'Symbol Card':<16} | {'Reduction'}")
+    print("  " + "-" * 85)
 
-    print(f"{'Task':<8} | {'Target Symbol':<25} | {'Baseline (Whole File)':<22} | {'AgentLens Symbol Card':<22} | {'Reduction'}")
-    print("-" * 95)
+    tot_lookup_base = 0
+    tot_lookup_card = 0
 
     for t in tasks:
         full_path = os.path.join(root_dir, t["file"])
         with open(full_path, "r", encoding="utf-8") as f:
             full_content = f.read()
 
-        baseline_chars = len(full_content)
         baseline_tokens = measure_tokens(full_content)
-
-        # AgentLens Symbol Card
         card = warm_cart.get_symbol_card(t["symbol"])
         card_text = warm_cart.format_card_markdown(card) if card else ""
-        card_chars = len(card_text)
         card_tokens = measure_tokens(card_text)
 
-        # Context slice with target implementation
+        reduc = ((baseline_tokens - card_tokens) / baseline_tokens) * 100
+        tot_lookup_base += baseline_tokens
+        tot_lookup_card += card_tokens
+        print(f"  {t['id']:<8} | {t['symbol']:<25} | {baseline_tokens:>5} tokens       | {card_tokens:>5} tokens      | -{reduc:.1f}%")
+
+    avg_lookup_reduc = ((tot_lookup_base - tot_lookup_card) / tot_lookup_base) * 100
+    print("  " + "-" * 85)
+    print(f"  {'TOTALS':<8} | {'3 Lookup Queries':<25} | {tot_lookup_base:>5} tokens       | {tot_lookup_card:>5} tokens      | -{avg_lookup_reduc:.1f}%\n")
+
+    print("  B. Realistic Task Edit Phase (Full Target + Caller/Test Files vs. Packed AST Slice):")
+    print("     * Note: Slices contain full implementation of target + imports + sibling stubs for syntax integrity.")
+    print(f"  {'Task':<8} | {'Target Symbol':<25} | {'Realistic Read':<18} | {'Packed AST Slice':<16} | {'Reduction'}")
+    print("  " + "-" * 85)
+
+    tot_edit_base = 0
+    tot_edit_slice = 0
+
+    for t in tasks:
+        # Realistic standard agent read: Target file + Caller / Test file
+        full_path = os.path.join(root_dir, t["file"])
+        caller_path = os.path.join(root_dir, t["caller_file"])
+        with open(full_path, "r", encoding="utf-8") as f:
+            c1 = f.read()
+        with open(caller_path, "r", encoding="utf-8") as f:
+            c2 = f.read()
+
+        realistic_baseline_tokens = measure_tokens(c1) + measure_tokens(c2)
+
+        # AgentLens workflow: AST Context Slice with full implementation + target lines
         slice_res = packer.pack(t["symbol"], token_budget=1000)
         slice_tokens = slice_res["estimated_tokens"]
 
-        reduction_pct = ((baseline_tokens - card_tokens) / baseline_tokens) * 100
-        total_baseline_tokens += baseline_tokens
-        total_lens_tokens += card_tokens
+        reduc = ((realistic_baseline_tokens - slice_tokens) / realistic_baseline_tokens) * 100
+        tot_edit_base += realistic_baseline_tokens
+        tot_edit_slice += slice_tokens
+        print(f"  {t['id']:<8} | {t['symbol']:<25} | {realistic_baseline_tokens:>5} tokens       | {slice_tokens:>5} tokens      | -{reduc:.1f}%")
 
-        print(f"{t['id']:<8} | {t['symbol']:<25} | {baseline_tokens:>6} tokens ({baseline_chars}c)  | {card_tokens:>6} tokens ({card_chars}c)   | -{reduction_pct:.1f}%")
-
-    avg_reduction = ((total_baseline_tokens - total_lens_tokens) / total_baseline_tokens) * 100
-    print("-" * 95)
-    print(f"TOTALS   | 3 Representative Tasks    | {total_baseline_tokens:>6} tokens ({total_baseline_tokens * 3.8:.0f}c)  | {total_lens_tokens:>6} tokens ({total_lens_tokens * 3.8:.0f}c)   | -{avg_reduction:.1f}% average")
+    avg_edit_reduc = ((tot_edit_base - tot_edit_slice) / tot_edit_base) * 100
+    print("  " + "-" * 85)
+    print(f"  {'TOTALS':<8} | {'3 End-to-End Tasks':<25} | {tot_edit_base:>5} tokens       | {tot_edit_slice:>5} tokens      | -{avg_edit_reduc:.1f}%\n")
 
     # 3. Dynamic Analysis & False Confidence Limits
     print("\n[3] CALIBRATED CONFIDENCE & DYNAMIC ANALYSIS LIMITS:")
