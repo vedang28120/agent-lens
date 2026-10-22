@@ -68,10 +68,17 @@ class CodebaseCartographer:
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS ast_cache (
                         file_path TEXT PRIMARY KEY,
+                        sha256 TEXT NOT NULL DEFAULT '',
                         mtime REAL NOT NULL,
                         data TEXT NOT NULL
                     )
                 """)
+                # Handle migration if existing table lacked sha256 column
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA table_info(ast_cache)")
+                columns = {row[1] for row in cursor.fetchall()}
+                if "sha256" not in columns:
+                    conn.execute("ALTER TABLE ast_cache ADD COLUMN sha256 TEXT NOT NULL DEFAULT ''")
                 conn.commit()
         except Exception:
             self.cache_enabled = False
@@ -91,18 +98,18 @@ class CodebaseCartographer:
             total_lines = 0
 
             # Pre-load cache if available
-            cached_entries: Dict[str, Tuple[float, str]] = {}
+            cached_entries: Dict[str, Tuple[str, float, str]] = {}
             if self.cache_enabled and os.path.exists(self.cache_db_path):
                 try:
                     with sqlite3.connect(self.cache_db_path, timeout=5.0) as conn:
                         cursor = conn.cursor()
-                        cursor.execute("SELECT file_path, mtime, data FROM ast_cache")
+                        cursor.execute("SELECT file_path, sha256, mtime, data FROM ast_cache")
                         for row in cursor.fetchall():
-                            cached_entries[row[0]] = (row[1], row[2])
+                            cached_entries[row[0]] = (row[1] or "", row[2], row[3])
                 except Exception:
                     pass
 
-            new_cache_rows: List[Tuple[str, float, str]] = []
+            new_cache_rows: List[Tuple[str, str, float, str]] = []
 
             for root, dirs, files in os.walk(self.root_path):
                 # Prune ignored directories
@@ -125,7 +132,7 @@ class CodebaseCartographer:
 
                     # Check persistent cache
                     if rel_path in cached_entries:
-                        cached_mtime, cached_json = cached_entries[rel_path]
+                        cached_sha256, cached_mtime, cached_json = cached_entries[rel_path]
                         if abs(cached_mtime - mtime) < 0.001:
                             try:
                                 data = json.loads(cached_json)
@@ -133,12 +140,29 @@ class CodebaseCartographer:
                                 cache_hits += 1
                             except Exception:
                                 parse_res = None
+                        else:
+                            # Content-Addressable Storage (CAS): verify SHA-256 hash
+                            try:
+                                with open(full_path, "rb") as f:
+                                    file_sha = hashlib.sha256(f.read()).hexdigest()
+                                if cached_sha256 and file_sha == cached_sha256:
+                                    data = json.loads(cached_json)
+                                    parse_res = self._deserialize_parse_result(data)
+                                    cache_hits += 1
+                                    new_cache_rows.append((rel_path, file_sha, mtime, cached_json))
+                            except Exception:
+                                pass
 
                     if parse_res is None:
                         parse_res = CodeParser.parse_file(full_path)
                         if self.cache_enabled:
+                            try:
+                                with open(full_path, "rb") as f:
+                                    file_sha = hashlib.sha256(f.read()).hexdigest()
+                            except Exception:
+                                file_sha = ""
                             serialized = json.dumps(parse_res.to_dict())
-                            new_cache_rows.append((rel_path, mtime, serialized))
+                            new_cache_rows.append((rel_path, file_sha, mtime, serialized))
 
                     self.file_results[rel_path] = parse_res
                     scanned_count += 1
@@ -161,7 +185,7 @@ class CodebaseCartographer:
                 try:
                     with sqlite3.connect(self.cache_db_path, timeout=5.0) as conn:
                         conn.executemany(
-                            "INSERT OR REPLACE INTO ast_cache (file_path, mtime, data) VALUES (?, ?, ?)",
+                            "INSERT OR REPLACE INTO ast_cache (file_path, sha256, mtime, data) VALUES (?, ?, ?, ?)",
                             new_cache_rows
                         )
                         conn.commit()
@@ -521,6 +545,7 @@ class CodebaseCartographer:
                 nodes.append({
                     "id": f_path,
                     "name": os.path.basename(f_path),
+                    "label": os.path.basename(f_path),
                     "type": "file",
                     "language": res.language,
                     "lines": res.line_count,
