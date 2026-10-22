@@ -110,6 +110,7 @@ class HallucinationGuard:
                                 "file": target_file,
                                 "message": f"Symbol `{sym_name}` is not defined in `{target_file}`.{suggestion}",
                                 "suggested": best,
+                                "suggested_match": best,
                             })
 
         # 2. Check function / method calls
@@ -143,12 +144,16 @@ class HallucinationGuard:
                                 "symbol": f"{receiver}.{fn_name}",
                                 "message": f"Method `{fn_name}` on `{receiver}` was not found in codebase index.{suggestion}",
                                 "suggested": best,
+                                "suggested_match": best,
                             })
 
+        is_clean = len(hallucinations) == 0
         return {
             "file": norm_file,
-            "valid": len(hallucinations) == 0,
+            "valid": is_clean,
+            "is_clean": is_clean,
             "hallucination_count": len(hallucinations),
+            "flagged_count": len(hallucinations),
             "hallucinations": hallucinations,
         }
 
