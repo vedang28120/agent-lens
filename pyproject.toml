@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-lens"
+version = "1.0.0"
+description = "Autonomous AI Coding Assistant Exoskeleton & Mission Control"
+authors = [{ name = "Antigravity Pair Programmer" }]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "tree-sitter>=0.21.0",
+    "tree-sitter-python",
+    "tree-sitter-javascript",
+    "tree-sitter-typescript"
+]
+
+[project.scripts]
+agent-lens = "agent_lens.cli:main"
