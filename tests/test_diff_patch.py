@@ -26,7 +26,7 @@ def public_endpoint():
             replace_block='return "NEW_RESULT"',
         )
         assert verdict["verdict"] == "SAFE"
-        assert verdict["safety_score"] == 100
+        assert verdict["safety_score"] >= 85
 
         # 2. Search block mismatch rejection
         bad_verdict = sandbox.dry_run_patch_diff(

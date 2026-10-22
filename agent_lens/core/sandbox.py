@@ -95,20 +95,29 @@ class GhostPatchSandbox:
                         f"Signature changed for `{mod['name']}`: callers may need parameter updates: {', '.join(list(callers)[:3])}"
                     )
 
-        # 5. Determine Verdict
+        # 5. Determine Verdict & Confidence
+        caveats = [
+            "Static analysis cannot guarantee safety against dynamic dispatch, getattr, **kwargs, or duck typing.",
+            "Run unit tests via shadow-worktree for definitive runtime verification."
+        ]
+
         if breakages:
             verdict = "DANGEROUS"
             score = 30
+            confidence = "HIGH_CONFIDENCE_FAILURE"
         elif warnings:
             verdict = "WARNING"
             score = 70
+            confidence = "STATIC_SIGNATURE_DRIFT"
         else:
             verdict = "SAFE"
-            score = 100
+            score = 90  # Never claim 100% in a dynamic language without test execution
+            confidence = "NO_STATIC_BREAKAGES"
 
         return {
             "verdict": verdict,
             "safety_score": score,
+            "confidence_assessment": confidence,
             "file": norm_file,
             "error": None,
             "added_symbols": added,
@@ -116,6 +125,7 @@ class GhostPatchSandbox:
             "modified_symbols": modified,
             "breakages": breakages,
             "warnings": warnings,
+            "caveats": caveats,
             "net_lines": shadow_result.line_count - (original_result.line_count if original_result else 0),
         }
 

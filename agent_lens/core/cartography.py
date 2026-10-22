@@ -450,9 +450,14 @@ class CodebaseCartographer:
                 "target_file": norm_file,
                 "target_symbol": symbol_name,
                 "risk_level": risk,
+                "known_static_callers": sorted(list(impacted_symbols))[:25],
                 "impacted_files": sorted(list(impacted_files)),
                 "impacted_symbols": sorted(list(impacted_symbols))[:25],
                 "related_tests": sorted(tests),
+                "caveats": [
+                    "Static AST analysis tracks explicit module imports and function calls.",
+                    "Dynamic dispatch, getattr, duck-typing, and runtime callbacks cannot be statically guaranteed."
+                ],
             }
 
     def get_file_outline(self, file_path: str) -> Optional[Dict[str, Any]]:
