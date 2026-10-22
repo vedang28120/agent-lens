@@ -142,25 +142,25 @@ Add `agent-lens` to your MCP configuration file (e.g. `~/.gemini/config/mcp_conf
 }
 ```
 
-> **Agent Protocol**: For recommended tool invocation ordering, see [`AGENT_PROTOCOL.md`](AGENT_PROTOCOL.md).
+> **Agent Protocol & Handbook**: For the comprehensive, tool-by-tool operational guide and real-world agent playbooks, see [`AGENT_GUIDE.md`](AGENT_GUIDE.md).
 
 ### Available MCP Tools
 
-| Tool Name | Parameters | Purpose |
-|---|---|---|
-| `lens_get_symbol_card` | `symbol`, `file_hint?`, `format?` | Ultra-dense signature, docstring, bounds, and callers (~50 tokens). |
-| `lens_pack_context` | `query`, `token_budget?` | AST-pruned syntax slice with target implementation. |
-| `lens_get_repo_map` | `token_budget?` | PageRank-prioritized repository structure map (<1,024 tokens). |
-| `lens_blast_radius` | `file`, `symbol?`, `format?` | Downstream impact radius, callers, and test files. |
-| `lens_ghost_patch` | `file`, `proposed_content` | In-memory AST syntax and contract verification. |
-| `lens_ghost_patch_diff` | `file`, `search_block?`, `replace_block?`, `diff_patch?` | Search-and-replace or unified diff hunk dry-run. |
-| `lens_shadow_test_sandbox` | `file_patches`, `test_command?`, `timeout?` | Executes tests in an isolated, ephemeral Git worktree. |
-| `lens_audit_dynamic_risk` | `symbol`, `file?` | Heuristic check for reflection, getattr, and duck typing. |
-| `lens_verify_hallucinations` | `file`, `content?` | Checks imported modules and methods against valid exports. |
-| `lens_plan_refactor` | `file`, `symbol?`, `objective?` | Generates dependency-ordered refactoring sequence. |
-| `lens_generate_delegation_briefing` | `objective`, `target_files`, `test_command?` | Generates tight contract briefing for subagents (<600 tokens). |
-| `lens_manage_memory` | `action`, `...` | SQLite working memory (hypotheses, tasks, decisions, memos). |
-| `lens_kill_port` | `port`, `confirm`, `force_non_dev?` | Two-phase confirmed termination of orphaned dev servers. |
+| Tool Name | Parameters | CLI Equivalent | Purpose |
+|---|---|---|---|
+| `lens_get_symbol_card` | `symbol`, `file_hint?`, `format?` | `python run.py card <symbol>` | Ultra-dense signature, docstring, bounds, and callers (~50 tokens). |
+| `lens_pack_context` | `query`, `token_budget?` | `python run.py pack <symbol>` | AST-pruned syntax slice with target implementation (~90% savings). |
+| `lens_get_repo_map` | `token_budget?` | `python run.py repomap --budget <tokens>` | PageRank-prioritized repository structure map (<1,024 tokens). |
+| `lens_blast_radius` | `file`, `symbol?`, `format?` | `python run.py blast --file <file>` | Downstream impact radius, callers, and test files. |
+| `lens_ghost_patch_diff` | `file`, `search_block?`, `replace_block?`, `diff_patch?` | `python run.py diff-patch <file> ...` | Search-and-replace or unified diff hunk dry-run. |
+| `lens_ghost_patch` | `file`, `proposed_content` | `python run.py ghost <file> --patch <f>` | Full file in-memory AST syntax and contract verification. |
+| `lens_shadow_test_sandbox` | `file_patches`, `test_command?`, `timeout?` | `python run.py shadow-test <file> ...` | Executes tests in an isolated, ephemeral Git worktree. |
+| `lens_audit_dynamic_risk` | `symbol`, `file?` | `python run.py dynamic-risk <symbol>` | Heuristic check for reflection, getattr, and duck typing. |
+| `lens_verify_hallucinations` | `file`, `content?` | `python run.py guard <file>` | Checks imported modules and methods against valid exports. |
+| `lens_plan_refactor` | `file`, `symbol?`, `objective?` | `python run.py plan <file> ...` | Generates dependency-ordered refactoring DAG sequence. |
+| `lens_generate_delegation_briefing` | `objective`, `target_files`, `test_command?` | `python run.py delegate ...` | Generates tight contract briefing for subagents (<600 tokens). |
+| `lens_manage_memory` | `action`, `...` | `python run.py memory <subcommand>` | SQLite working memory (hypotheses, tasks, decisions, memos). |
+| `lens_kill_port` | `port`, `confirm`, `force_non_dev?` | `python run.py kill-port <port> --confirm` | Two-phase confirmed termination of orphaned dev servers. |
 
 ---
 
@@ -184,41 +184,70 @@ Open **[http://localhost:4141](http://localhost:4141)** in your browser.
 
 ---
 
-## 🚀 CLI Quick Start
+## 🚀 CLI Commands & Practical Examples
+
+Every MCP capability is also directly accessible via CLI for terminal workflows, automated scripts, and CI:
 
 ```bash
-# 1. Scan codebase and index into SQLite AST cache
+# 1. Macro Cartography: Scan codebase and index into SQLite AST cache
 python run.py scan
+# Output: Scanned 56 files (8,887 LOC), indexed 544 symbols in 22.3 ms.
 
-# 2. Inspect a symbol with an ultra-dense Symbol Card
+# 2. Meso Inspection: Inspect a symbol with an ultra-dense Symbol Card (<100 tokens)
 python run.py card CodebaseCartographer
+# Output: Returns class signature, line bounds (14-220), methods, docstring, and callers.
 
-# 3. Generate a PageRank repository map under 1,024 tokens
+# 3. Structural Map: Generate a PageRank repository map under 1,024 tokens
 python run.py repomap --budget 1024
+# Output: Structural tree of core files and symbols ranked by architectural centrality.
 
-# 4. Pack a context-pruned prompt slice
+# 4. Context Slicing: Pack a pruned prompt slice with full target function + stubbed siblings
 python run.py pack calculate_blast_radius --budget 800
+# Output: Full calculate_blast_radius implementation with imports (90% token reduction).
 
-# 5. Calculate downstream blast radius
+# 5. Blast Radius: Calculate downstream callers and discover associated tests
 python run.py blast --file agent_lens/core/cartography.py --symbol calculate_blast_radius
+# Output: Risk: HIGH (6 caller files, 14 impacted symbols, tests/test_cartography.py).
 
-# 6. Audit dynamic language risks
+# 6. Dynamic Risk: Audit for reflection (getattr), registry lookups, and duck typing
 python run.py dynamic-risk calculate_blast_radius
+# Output: Risk: MODERATE (2 unverified attribute accesses flagged with line numbers).
 
-# 7. Dry-run a patch without touching disk
-python run.py diff-patch agent_lens/core/cartography.py --search "old_code" --replace "new_code"
+# 7. In-Memory Dry-Run: Test search/replace or diff patch without touching disk
+python run.py diff-patch agent_lens/core/parser.py --search "ext == '.js'" --replace "ext in ['.js', '.jsx']"
+# Output: Verdict: [SAFE] (Safety Score: 90/100, Net lines: 0, Breakages: 0).
 
-# 8. Run tests in an isolated Git worktree
-python run.py shadow-test agent_lens/core/cartography.py --patch /path/to/patch.py --cmd "pytest"
+# 8. Shadow Worktree Testing: Run tests in an isolated Git worktree (zero dirty files)
+python run.py shadow-test agent_lens/core/parser.py --patch /path/to/patch.py --cmd "pytest tests/test_parser.py"
+# Output: Sandbox shadow-3f8a91b2: Tests PASSED in 1.42s (main working directory untouched).
 
-# 9. Check listening developer ports
+# 9. Hallucination Guard: Cross-check imports against project exports & stdlib
+python run.py guard agent_lens/cli.py
+# Output: File clean: All 18 imported symbols exist in stdlib or project modules.
+
+# 10. Refactor Planner: Generate dependency-ordered refactoring DAG steps
+python run.py plan agent_lens/core/cartography.py --symbol calculate_blast_radius --objective "Add max_depth"
+# Output: Ordered steps: Step 1 (Update definition) -> Step 2 (Update callers) -> Step 3 (Run tests).
+
+# 11. Subagent Delegation: Produce tight work briefing contract (<600 tokens)
+python run.py delegate --objective "Add JSX support" --files agent_lens/core/parser.py --cmd "pytest"
+# Output: Markdown delegation contract with allowed files, forbidden files, and tests.
+
+# 12. Dev Port Sentinel: Check listening developer servers (read-only)
 python run.py ports
+# Output: Port 3000 (PID 14210, Vite, Dev: YES), Port 4141 (PID 8912, AgentLens, Dev: YES).
 
-# 10. Terminate an orphaned dev port (requires confirmation)
+# 13. Port Terminator: Safely terminate an orphaned dev server (requires confirmation)
 python run.py kill-port 3000 --confirm
+# Output: Terminated Vite (PID 14210) on port 3000.
 
-# 11. Launch Mission Control dashboard
+# 14. Architecture Report: Generate a comprehensive markdown audit of the codebase
+python run.py report -o ARCHITECTURE_REPORT.md
+# Output: Architecture report generated: ARCHITECTURE_REPORT.md.
+
+# 15. Launch Mission Control: Real-time interactive web dashboard
 python run.py serve --port 4141
+# Output: Serving AgentLens Mission Control on http://localhost:4141.
 ```
 
 ---
